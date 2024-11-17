@@ -1,0 +1,81 @@
+[project]
+name = "github-checks"
+description = "Minimal Python API for GitHub Checks to submit feedback from builds running on 3rd party build platforms"
+readme = "README.md"
+version = "0.0.1"
+requires-python = ">=3.10"
+dependencies = [
+    "jwt",
+    "requests",
+]
+
+[project.optional-dependencies]
+dev = [
+    "bandit",
+    "black",
+    "isort",
+    "mypy",
+    "pre-commit",
+    "pycodestyle",
+    "pydantic",
+    "pydocstyle",
+    "ruff",
+    "types-requests",
+]
+
+[tool.setuptools.packages.find]
+include = []
+
+[tool.ruff]
+line-length = 88
+output-format = "grouped"
+src = ["src"]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["ALL"]
+extend-select = [
+    "I", # isort
+    "W", # pycodestyle
+]
+exclude = ["__init__.py", ".venv", "tests"]
+ignore = [] # globally enable all warnings
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.isort]
+profile = "black"
+atomic = true
+line-length = 88
+src_paths = ["src"]
+skip = ["tests", ".venv", ".gitignore", ".md"]
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+float_to_top = true
+combine_as_imports = true
+group_by_package = true
+ensure_newline_before_comments = true
+default_section = ["THIRDPARTY"]
+import_heading_future = "Future"
+import_heading_stdlib = "Standard Library"
+import_heading_firstparty = "First Party"
+import_heading_thirdparty = "Third Party"
+import_heading_localfolder = "Local Folder"
+known_first_party = []
+known_local_folder = "src"
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+show_error_codes = true
+ignore_missing_imports = true
+follow_imports = "skip"
+allow_untyped_calls = true
+disallow_subclassing_any = false

@@ -1,0 +1,24 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v2.3.0
+    hooks:
+      - id: end-of-file-fixer
+        name: 'Verify valid end-of-file'
+      - id: trailing-whitespace
+        name: 'Flag any trailing whitespace'
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.4
+    hooks:
+      - id: ruff-format
+        name: 'Format python files with ruff'
+      - id: ruff
+        name: 'Lint python files with ruff'
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        name: 'Run type validation on python files with mypy'
+        args: [--config-file=./pyproject.toml, --ignore-missing-imports, --python-executable=./.venv/bin/python]
+        files: .*\.py
+        pass_filenames: true
+fail_fast: true

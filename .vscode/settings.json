@@ -1,0 +1,31 @@
+{
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/CVS": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true,
+        "**/__pycache__": true,
+        ".mypy_cache": true,
+        ".venv": true,
+        "**/*.egg-info": true,
+    },
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "[python]":{
+        "diffEditor.ignoreTrimWhitespace": false,
+        "editor.formatOnType": true,
+        "editor.formatOnSave": true,
+        "editor.wordBasedSuggestions": "off",
+        "gitlens.codeLens.symbolScopes": [
+            "!Module"
+        ],
+        "editor.defaultFormatter": "charliermarsh.ruff"
+    },
+
+    "workbench.editor.tabSizing": "shrink",
+    "editor.rulers": [
+        88
+    ],
+}
