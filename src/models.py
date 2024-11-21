@@ -6,35 +6,96 @@ from pydantic import BaseModel
 
 
 class CheckRunConclusion(Enum):
-    """The valid conclusion states of a check run."""
+    """The valid conclusion states of a check run.
 
-    SUCCESS = "success"
+    See https://docs.github.com/en/rest/checks/runs#update-a-check-run for details.
+    """
+
     ACTION_REQUIRED = "action_required"
+    SUCCESS = "success"
+    FAILURE = "failure"
+    NEUTRAL = "neutral"
+    SKIPPED = "skipped"
+    STALE = "stale"
+    TIMED_OUT = "timed_out"
     CANCELLED = "cancelled"
 
 
 class AnnotationLevel(Enum):
-    """The severity levels permitted by GitHub checks for each individual annotation."""
+    """The severity levels permitted by GitHub checks for each individual annotation.
+
+    See https://docs.github.com/en/rest/checks/runs#update-a-check-run for details.
+    """
 
     NOTICE = "notice"
     WARNING = "warning"
     FAILURE = "failure"
 
 
-class ChecksAnnotation(BaseModel):
-    """Models the json expected by GitHub checks for each individual annotation."""
+class CheckRunAction(BaseModel):
+    """Actions requested by this check run (never used in the context of this package).
 
-    repo_relative_filepath: str
-    start_line: int | None
-    end_line: int | None
-    annotation_level: AnnotationLevel
+    See https://docs.github.com/en/rest/checks/runs#update-a-check-run for details.
+    """
+
+    label: str
+    description: str
+    identifier: str
+
+
+class ChecksImage(BaseModel):
+    """Image posted on check run conclusion (never used in the context of this package).
+
+    See https://docs.github.com/en/rest/checks/runs#update-a-check-run for details.
+    """
+
+    alt: str
+    image_url: str
+    caption: str | None
+
+
+class ChecksAnnotation(BaseModel):
+    """Models the json expected by GitHub checks for each individual annotation.
+
+    See https://docs.github.com/en/rest/checks/runs#update-a-check-run for details.
+    """
+
+    filepath: str
     message: str
-    raw_details: str | None
+    annotation_level: AnnotationLevel
+    start_line: int = 0
+    end_line: int = 0
+    start_column: int | None = None  # note: only permitted on same line as end_column
+    end_column: int | None = None  # note: only permitted on same line as start_column
+    title: str | None = None
+    raw_details: str | None = None
 
 
 class CheckRunOutput(BaseModel):
-    """The json format expected for the output of a Checks run."""
+    """The json format expected for the output of a Checks run.
 
-    title: str
+    See https://docs.github.com/en/rest/checks/runs#update-a-check-run for details.
+    """
+
+    title: str | None
     summary: str
+    text: str | None
     annotations: list[ChecksAnnotation] | None
+    images: list[ChecksImage] | None
+
+
+class CheckRunUpdatePOSTBody(BaseModel):
+    """The body for the POST request to be sent to `<repo_url>/check-runs/check_id_run`.
+
+    See https://docs.github.com/en/rest/checks/runs#update-a-check-run for details.
+    """
+
+    name: str | None = None
+    details_url: str | None = None
+    external_id: str | None = None
+    started_at: str | None = None
+    status: str | None = None
+    conclusion: str | None = None
+    completed_at: str | None = None
+    output: CheckRunOutput | None = None
+    actions: CheckRunAction | None = None
