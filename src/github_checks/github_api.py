@@ -58,7 +58,10 @@ def authenticate_as_github_app(
 ) -> str:
     """Authenticate as the specified GitHub App installation to get an access token.
 
-    :param app_privkey_pem: private key for this app in PEM format
+    :param app_id: ID of your app, e.g. found in the URL path of your App config
+    :param app_installation_id: ID of the App's installation to the repo
+    :param app_privkey_pem: private key provided by GitHub for this app, in PEM format
+    :param github_api_base_url: API URL of your GitHub instance (cloud or enterprise)
     :param timeout: request timeout in seconds, optional, defaults to 10
     :return: the GitHub App access token
     """
@@ -144,6 +147,7 @@ class CheckRun:
         """Update the current check run with a list of Checks annotations.
 
         :param annotations: the Checks annotations
+        :raises HTTPError: in case the GitHub API could not start the check run
         """
         self._annotation_levels.update(
             annotation.annotation_level for annotation in annotations
@@ -189,6 +193,7 @@ class CheckRun:
 
         :param output: the results of this check run, for annotating a PR, optional
         :param conclusion: the overall success, to be fed back for PR approval, optional
+        :raises HTTPError: in case the GitHub API could not start the check run
         """
         if not output:
             output = CheckRunOutput(
