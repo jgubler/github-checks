@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from models import AnnotationLevel, ChecksAnnotation
+from github_checks.models import AnnotationLevel, ChecksAnnotation
 
 
 class _CodePosition(BaseModel):

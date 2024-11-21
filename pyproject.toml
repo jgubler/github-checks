@@ -1,6 +1,12 @@
+[build-system]
+requires = ["setuptools"]
+
 [project]
 name = "github-checks"
 description = "Minimal Python API for GitHub Checks to submit feedback from builds running on 3rd party build platforms"
+authors = [
+    {name = "Julian Gubler", email = "mail@juliangubler.de"}
+]
 readme = "README.md"
 version = "0.0.1"
 requires-python = ">=3.10"
@@ -23,9 +29,6 @@ dev = [
     "ruff",
     "types-requests",
 ]
-
-[tool.setuptools.packages.find]
-include = []
 
 [tool.ruff]
 line-length = 88

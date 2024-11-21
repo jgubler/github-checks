@@ -1,0 +1,11 @@
+::error title=Ruff (E722),file=/home/jgubler-wsl/repos/github-checks/src/github_checks/github_api.py,line=69,col=5,endLine=69,endColumn=11::src/github_checks/github_api.py:69:5: E722 Do not use bare `except`
+::error title=Ruff (E722),file=/home/jgubler-wsl/repos/github-checks/src/github_checks/github_api.py,line=69,col=5,endLine=69,endColumn=11::src/github_checks/github_api.py:69:5: E722 Do not use bare `except`
+::error title=Ruff (G003),file=/home/jgubler-wsl/repos/github-checks/src/github_checks/github_api.py,line=68,col=19,endLine=68,endColumn=42::src/github_checks/github_api.py:68:19: G003 Logging statement uses `+`
+::error title=Ruff (G003),file=/home/jgubler-wsl/repos/github-checks/src/github_checks/github_api.py,line=67,col=19,endLine=67,endColumn=42::src/github_checks/github_api.py:67:19: G003 Logging statement uses `+`
+::error title=Ruff (G003),file=/home/jgubler-wsl/repos/github-checks/src/github_checks/github_api.py,line=67,col=19,endLine=67,endColumn=42::src/github_checks/github_api.py:67:19: G003 Logging statement uses `+`
+::error title=Ruff (G003),file=/home/jgubler-wsl/repos/github-checks/src/github_checks/github_api.py,line=67,col=19,endLine=67,endColumn=42::src/github_checks/github_api.py:67:19: G003 Logging statement uses `+`
+::error title=Ruff (G003),file=/home/jgubler-wsl/repos/github-checks/src/github_checks/github_api.py,line=67,col=19,endLine=67,endColumn=42::src/github_checks/github_api.py:67:19: G003 Logging statement uses `+`
+::error title=Ruff (G003),file=/home/jgubler-wsl/repos/github-checks/src/github_checks/github_api.py,line=73,col=19,endLine=73,endColumn=42::src/github_checks/github_api.py:73:19: G003 Logging statement uses `+`
+::error title=Ruff (G003),file=/home/jgubler-wsl/repos/github-checks/src/github_checks/github_api.py,line=73,col=19,endLine=73,endColumn=42::src/github_checks/github_api.py:73:19: G003 Logging statement uses `+`
+::error title=Ruff (G003),file=/home/jgubler-wsl/repos/github-checks/src/github_checks/github_api.py,line=73,col=19,endLine=73,endColumn=42::src/github_checks/github_api.py:73:19: G003 Logging statement uses `+`
+::error title=Ruff (G003),file=/home/jgubler-wsl/repos/github-checks/src/github_checks/github_api.py,line=73,col=19,endLine=73,endColumn=42::src/github_checks/github_api.py:73:19: G003 Logging statement uses `+`

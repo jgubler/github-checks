@@ -10,9 +10,9 @@ from urllib.parse import ParseResult, urlparse
 
 from configargparse import ArgumentParser
 
-from formatters.ruff import format_ruff_json_output
-from github_api import CheckRun, authenticate_as_github_app
-from models import CheckRunConclusion, ChecksAnnotation
+from github_checks.formatters.ruff import format_ruff_json_output
+from github_checks.github_api import CheckRun, authenticate_as_github_app
+from github_checks.models import CheckRunConclusion, ChecksAnnotation
 
 log_to_annotation_formatters: dict[
     str,
@@ -24,9 +24,10 @@ log_to_annotation_formatters: dict[
 
 if __name__ == "__main__":
     argparser = ArgumentParser(
-        help="CLI for the github-checks library. Please note: the commands of this CLI "
-        "need to be used in a specific order (see individual command help for details) "
-        "and pass values to each other through environment variables.",
+        prog="github-checks",
+        description="CLI for the github-checks library. Please note: the commands of "
+        "this CLI need to be used in a specific order (see individual command help for "
+        "details) and pass values to each other through environment variables.",
     )
     argparser.add_argument(
         "--pickle-filepath",
@@ -34,7 +35,11 @@ if __name__ == "__main__":
         default=Path("/tmp/github-checks.pkl"),  # noqa: S108
         help="path for the file in which the check run state will be conserved",
     )
-    subparsers = argparser.add_subparsers()
+    subparsers = argparser.add_subparsers(
+        description="Operation to be performed by the CLI.",
+        required=True,
+        dest="command",
+    )
     init_parser = subparsers.add_parser(
         "init",
         help="Authenticate this environment as a valid check run session for the GitHub"
@@ -125,7 +130,6 @@ if __name__ == "__main__":
     )
     finish_parser.add_argument(
         "--no-cleanup",
-        type=bool,
         action="store_true",
         help="Don't clean up local environment variables. Note: Only use this if you "
         "plan to run another checks run in this environment. Otherwise, sensitive "
@@ -135,23 +139,23 @@ if __name__ == "__main__":
 
     args = argparser.parse_args(sys.argv[1:])
 
-    if args.init:
+    if args.command == "init":
         os.environ["GH_REPO_BASE_URL"] = args.repo_base_url
         # we do need the repo base url later, but we only need domain itself here
         # for github cloud, this would be https://github.com, for enterprise it's diff
         url_parts: ParseResult = urlparse(args.repo_base_url)
-        github_base_url: str = f"{url_parts.scheme}://{url_parts.netloc}"
+        github_api_base_url: str = f"{url_parts.scheme}://api.{url_parts.netloc}"
 
         token = authenticate_as_github_app(
             app_id=args.app_id,
             app_installation_id=args.app_install_id,
-            github_base_url=github_base_url,
+            github_api_base_url=github_api_base_url,
             app_privkey_pem=args.pem_path,
         )
         os.environ["GH_APP_TOKEN"] = token
 
     check_run: CheckRun
-    if args.start_check_run:
+    if args.command == "start-check-run":
         repo_base_url: str | None = os.getenv("GH_REPO_BASE_URL", None)
         github_app_token: str | None = os.getenv("GH_APP_TOKEN")
         if not (repo_base_url and github_app_token):
@@ -168,7 +172,7 @@ if __name__ == "__main__":
         with args.pickle_filepath.open("wb") as pickle_file:
             pickle.dump(check_run, pickle_file)
 
-    if args.add_check_annotations:
+    elif args.command == "add-check-annotations":
         if not args.pickle_filepath.exists():
             logging.fatal(
                 "[github-checks] Error: Trying to update a github check, but no check "
@@ -202,7 +206,7 @@ if __name__ == "__main__":
             check_run = pickle.load(pickle_file)  # noqa: S301
         check_run.update_annotations(list(annotations))
 
-    if args.finish_check_run:
+    elif args.command == "finish-check-run":
         if not args.pickle_filepath.exists():
             logging.fatal(
                 "[github-checks] Error: Trying to update a github check, but no check "

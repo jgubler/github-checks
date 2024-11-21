@@ -1,5 +1,7 @@
 """Utility functions to help interface with the GitHub checks API."""
 
+import logging
+import sys
 import time
 from collections.abc import Iterable
 from datetime import datetime
@@ -7,9 +9,9 @@ from itertools import islice
 from pathlib import Path
 
 import jwt
-from requests import Response, patch, post
+from requests import HTTPError, Response, patch, post
 
-from models import (
+from github_checks.models import (
     AnnotationLevel,
     CheckRunConclusion,
     CheckRunOutput,
@@ -22,6 +24,7 @@ def _get_jwt_headers(jwt_str: str, accept_type: str) -> dict[str, str]:
     return {
         "Accept": f"{accept_type}",
         "Authorization": f"Bearer {jwt_str}",
+        "X-GitHub-Api-Version": "2022-11-28",
     }
 
 
@@ -31,21 +34,26 @@ def _generate_app_jwt_from_pem(
     ttl_seconds: int = 600,
 ) -> str:
     with pem_filepath.open("rb") as pem_file:
-        priv_key = jwt.jwk_from_pem(pem_file.read())
+        priv_key = pem_file.read()
     jwt_payload = {
         "iat": int(time.time()),
         "exp": int(time.time()) + ttl_seconds,
         "iss": app_id,
     }
-    jwt_instance = jwt.JWT()
-    return str(jwt_instance.encode(jwt_payload, priv_key, alg="RS256"))
+    return str(
+        jwt.JWT().encode(
+            jwt_payload,
+            jwt.jwk_from_pem(priv_key.strip()),
+            alg="RS256",
+        ),
+    )
 
 
 def authenticate_as_github_app(
     app_id: str,
     app_installation_id: str,
-    github_base_url: str,
     app_privkey_pem: Path,
+    github_api_base_url: str = "https://api.github.com",
     timeout: int = 10,
 ) -> str:
     """Authenticate as the specified GitHub App installation to get an access token.
@@ -56,14 +64,18 @@ def authenticate_as_github_app(
     """
     app_jwt: str = _generate_app_jwt_from_pem(app_privkey_pem, app_id)
     url: str = (
-        f"{github_base_url}/app/installations/{app_installation_id}/access_tokens"
+        f"{github_api_base_url}/app/installations/{app_installation_id}/access_tokens"
     )
     headers = _get_jwt_headers(
         app_jwt,
-        "application/vnd.github.machine-man-preview+json",
+        "application/vnd.github+json",
     )
     response: Response = post(url, headers, timeout=timeout)
-    response.raise_for_status()
+    try:
+        response.raise_for_status()
+    except HTTPError:
+        logging.exception(str(response.text))
+        sys.exit(-1)
     return str(response.json().get("token"))
 
 
