@@ -9,9 +9,9 @@ from pydantic import BaseModel
 
 from github_checks.models import (
     AnnotationLevel,
+    CheckAnnotation,
     CheckRunConclusion,
     CheckRunOutput,
-    ChecksAnnotation,
 )
 
 
@@ -48,7 +48,7 @@ def _format_annotations_for_ruff_json_output(
     json_output_fp: Path,
     local_repo_base: Path,
     annotation_level: AnnotationLevel,
-) -> Iterable[ChecksAnnotation]:
+) -> Iterable[CheckAnnotation]:
     """Generate annotations for the ruff's output when run with output-format=json.
 
     :param json_output_fp: filepath to the full json output from ruff
@@ -74,7 +74,7 @@ def _format_annotations_for_ruff_json_output(
                     for edit in ruff_err.fix.edits
                 )
             )
-        yield ChecksAnnotation(
+        yield CheckAnnotation(
             annotation_level=annotation_level,
             start_line=ruff_err.location.row,
             start_column=ruff_err.location.column if err_is_on_one_line else None,
@@ -106,7 +106,7 @@ def format_ruff_check_run_output(
         )
 
     # Use warning level for annotations (since nothing broke, but still needs fixing)
-    annotations: list[ChecksAnnotation] = list(
+    annotations: list[CheckAnnotation] = list(
         _format_annotations_for_ruff_json_output(
             json_output_fp,
             local_repo_base,

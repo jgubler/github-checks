@@ -55,7 +55,7 @@ class ChecksImage(BaseModel):
     caption: str | None
 
 
-class ChecksAnnotation(BaseModel):
+class CheckAnnotation(BaseModel):
     """Models the json expected by GitHub checks for each individual annotation.
 
     See https://docs.github.com/en/rest/checks/runs#update-a-check-run for details.
@@ -86,7 +86,7 @@ class CheckRunOutput(BaseModel):
     title: str | None
     summary: str
     text: str | None = None
-    annotations: list[ChecksAnnotation] | None = None
+    annotations: list[CheckAnnotation] | None = None
     images: list[ChecksImage] | None = None
 
 

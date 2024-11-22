@@ -15,10 +15,10 @@ from requests import HTTPError, Response, Session
 
 from github_checks.models import (
     AnnotationLevel,
+    CheckAnnotation,
     CheckRunConclusion,
     CheckRunOutput,
     CheckRunUpdatePOSTBody,
-    ChecksAnnotation,
 )
 
 
@@ -263,16 +263,16 @@ class GitHubChecks:
 
     @staticmethod
     def _annotation_batches(
-        annotations: list[ChecksAnnotation],
+        annotations: list[CheckAnnotation],
         batch_size: int = 50,
-    ) -> Iterable[list[ChecksAnnotation]]:
+    ) -> Iterable[list[CheckAnnotation]]:
         """Chunk the annotations, as GitHub API accepts <= 50 annotations at once."""
         for i in range(0, len(annotations), batch_size):
             yield annotations[i : i + batch_size]
 
     def _infer_conclusion(
         self,
-        annotations: list[ChecksAnnotation],
+        annotations: list[CheckAnnotation],
     ) -> CheckRunConclusion:
         annotation_levels = {annotation.annotation_level for annotation in annotations}
         if AnnotationLevel.FAILURE in annotation_levels:

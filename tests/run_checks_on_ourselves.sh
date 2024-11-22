@@ -5,7 +5,7 @@ export GH_APP_ID="1065841" GH_APP_INSTALL_ID="57443831"
 export GH_PRIVATE_KEY_PEM="<>"
 export GH_REPO_BASE_URL="https://github.com/jgubler/github-checks"
 export GH_CHECK_REVISION="$(git rev-parse HEAD)"
-export GH_LOCAL_REPO_PATH="/home/jdoe/repos/github-checks"
+export GH_LOCAL_REPO_PATH="/home/user/repos/github-checks"
 
 # set up a venv, and install this package in it, including dev dependencies
 # ideally we'll split CI dependencies from dev dependencies at some point
