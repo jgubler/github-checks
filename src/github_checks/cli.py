@@ -6,17 +6,16 @@ import pickle
 import sys
 from collections.abc import Callable, Iterable
 from pathlib import Path
-from urllib.parse import ParseResult, urlparse
 
 from configargparse import ArgumentParser
 
 from github_checks.formatters.ruff import format_ruff_json_output
-from github_checks.github_api import CheckRun, authenticate_as_github_app
+from github_checks.github_api import GitHubChecks
 from github_checks.models import CheckRunConclusion, ChecksAnnotation
 
 log_to_annotation_formatters: dict[
     str,
-    Callable[[str, Path], Iterable[ChecksAnnotation]],
+    Callable[[Path, Path], Iterable[ChecksAnnotation]],
 ] = {
     "ruff-json": format_ruff_json_output,
 }
@@ -33,7 +32,7 @@ if __name__ == "__main__":
         "--pickle-filepath",
         type=Path,
         default=Path("/tmp/github-checks.pkl"),  # noqa: S108
-        help="path for the file in which the check run state will be conserved",
+        help="File in which the authenticated checks session will be cached.",
     )
     subparsers = argparser.add_subparsers(
         description="Operation to be performed by the CLI.",
@@ -44,7 +43,8 @@ if __name__ == "__main__":
         "init",
         help="Authenticate this environment as a valid check run session for the GitHub"
         " App installation, retrieving an app token to authorize subsequent check run "
-        "orchestration actions. This will set a `GH_APP_TOKEN` environment variable.",
+        "orchestration actions. This will store an authenticated GitHub checks session"
+        "in the file configured in `--pickle-filepath`.",
     )
     init_parser.add_argument(
         "--app-id",
@@ -69,6 +69,12 @@ if __name__ == "__main__":
         type=str,
         env_var="GH_APP_INSTALL_ID",
         help="ID of the repository's GitHub App installation used by the check.",
+    )
+    init_parser.add_argument(
+        "--overwrite-existing",
+        action="store_true",
+        help="If an existing checks session is found (pickle file exists), overwrite it"
+        ". If a session is found and this is not set, initialization will abort.",
     )
 
     start_parser = subparsers.add_parser(
@@ -138,45 +144,49 @@ if __name__ == "__main__":
     )
 
     args = argparser.parse_args(sys.argv[1:])
+    gh_checks: GitHubChecks
 
     if args.command == "init":
         os.environ["GH_REPO_BASE_URL"] = args.repo_base_url
-        # we do need the repo base url later, but we only need domain itself here
-        # for github cloud, this would be https://github.com, for enterprise it's diff
-        url_parts: ParseResult = urlparse(args.repo_base_url)
-        github_api_base_url: str = f"{url_parts.scheme}://api.{url_parts.netloc}"
 
-        token = authenticate_as_github_app(
+        if args.pickle_filepath.exists() and not args.overwrite_existing:
+            logging.fatal(
+                "[github-checks] Trying to initialize GitHub checks, but an instance "
+                "is already initialized (pickle file exists) and `--overwrite-existing`"
+                " is not set. Aborting.",
+            )
+            sys.exit(-1)
+
+        gh_checks = GitHubChecks(
+            repo_base_url=args.repo_base_url,
             app_id=args.app_id,
             app_installation_id=args.app_install_id,
-            github_api_base_url=github_api_base_url,
             app_privkey_pem=args.pem_path,
         )
-        os.environ["GH_APP_TOKEN"] = token
+        with args.pickle_filepath.open("wb") as pickle_file:
+            pickle.dump(gh_checks, pickle_file)
 
-    check_run: CheckRun
     if args.command == "start-check-run":
-        repo_base_url: str | None = os.getenv("GH_REPO_BASE_URL", None)
-        github_app_token: str | None = os.getenv("GH_APP_TOKEN")
-        if not (repo_base_url and github_app_token):
-            sys.exit(
-                "[github-checks] Error: Trying to start a github check without "
-                "initialization. Quitting.",
+        if not args.pickle_filepath.exists():
+            logging.fatal(
+                "[github-checks] Trying to start a github check without "
+                "initialization (pickle file not found). Aborting.",
             )
-        check_run = CheckRun(
-            repo_base_url=repo_base_url,
+            sys.exit(-1)
+        with args.pickle_filepath.open("rb") as pickle_file:
+            gh_checks = pickle.load(pickle_file)  # noqa: S301
+        gh_checks.start_check_run(
             revision_sha=args.revision_sha,
             check_name=args.check_name,
-            app_access_token=github_app_token,
         )
         with args.pickle_filepath.open("wb") as pickle_file:
-            pickle.dump(check_run, pickle_file)
+            pickle.dump(gh_checks, pickle_file)
 
     elif args.command == "add-check-annotations":
         if not args.pickle_filepath.exists():
             logging.fatal(
-                "[github-checks] Error: Trying to update a github check, but no check "
-                "is currently running. Quitting.",
+                "[github-checks] Trying to update a github check, but no check "
+                "is currently running. Aborting.",
             )
             sys.exit(-1)
 
@@ -187,24 +197,24 @@ if __name__ == "__main__":
             if (
                 not remote_repo_name
                 or not (
-                    local_repo_path := Path().cwd() / remote_repo_name.split("/")[-1]
+                    local_repo_path := (Path().cwd() / remote_repo_name.split("/")[-1])
                 )
                 or not local_repo_path.exists()
             ):
                 logging.fatal(
-                    "Cannot find local repository copy for resolution of relative "
-                    "paths. Aborting.",
+                    "[github-checks] Cannot find local repository copy for resolution "
+                    "of relative paths. Aborting.",
                 )
                 sys.exit("-1")
 
         annotations = log_to_annotation_formatters[args.log_format](
             args.validation_log,
-            local_repo_path,
+            Path(args.local_repo_path),
         )
 
         with args.pickle_filepath.open("rb") as pickle_file:
-            check_run = pickle.load(pickle_file)  # noqa: S301
-        check_run.update_annotations(list(annotations))
+            gh_checks = pickle.load(pickle_file)  # noqa: S301
+        gh_checks.update_annotations(list(annotations))
 
     elif args.command == "finish-check-run":
         if not args.pickle_filepath.exists():
@@ -215,8 +225,8 @@ if __name__ == "__main__":
             sys.exit(-1)
 
         with args.pickle_filepath.open("rb") as pickle_file:
-            check_run = pickle.load(pickle_file)  # noqa: S301
-        check_run.finish(args.conclusion)
+            gh_checks = pickle.load(pickle_file)  # noqa: S301
+        gh_checks.finish_check_run(args.conclusion)
 
         # delete the pickle file for this run, it won't be needed anymore
         args.pickle_filepath.unlink()
@@ -224,7 +234,6 @@ if __name__ == "__main__":
         # unless disabled, clean up local environment variables
         if not args.no_cleanup:
             for env_var in [
-                "GH_APP_TOKEN",
                 "GH_APP_ID",
                 "GH_APP_INSTALL_ID",
                 "GH_PRIVATE_KEY_PEM",

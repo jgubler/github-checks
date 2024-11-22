@@ -1,6 +1,7 @@
 """Model representation of GitHub checks specific dictionary/json structures."""
 
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -60,7 +61,7 @@ class ChecksAnnotation(BaseModel):
     See https://docs.github.com/en/rest/checks/runs#update-a-check-run for details.
     """
 
-    filepath: str
+    path: str
     message: str
     annotation_level: AnnotationLevel
     start_line: int = 0
@@ -69,6 +70,11 @@ class ChecksAnnotation(BaseModel):
     end_column: int | None = None  # note: only permitted on same line as start_column
     title: str | None = None
     raw_details: str | None = None
+
+    def model_dump(  # noqa: D102
+        self,
+    ) -> Any:  # noqa: ANN401
+        return super().model_dump(exclude_none=True, exclude_unset=True)
 
 
 class CheckRunOutput(BaseModel):
@@ -79,9 +85,9 @@ class CheckRunOutput(BaseModel):
 
     title: str | None
     summary: str
-    text: str | None
-    annotations: list[ChecksAnnotation] | None
-    images: list[ChecksImage] | None
+    text: str | None = None
+    annotations: list[ChecksAnnotation] | None = None
+    images: list[ChecksImage] | None = None
 
 
 class CheckRunUpdatePOSTBody(BaseModel):

@@ -40,15 +40,18 @@ class _RuffJSONError(BaseModel):
 
 
 def format_ruff_json_output(
-    json_dump: str,
+    json_output_fp: Path,
     local_repo_base: Path,
 ) -> Iterable[ChecksAnnotation]:
     """Generate annotations for the ruff's output when run with output-format=json.
 
-    :param json_dump: the full json output from ruff, as a string
+    :param json_output_fp: filepath to the full json output from ruff
     :param local_repo_base: local repository base path, for deriving repo-relative paths
     """
-    for error_dict in json.loads(json_dump):
+    with json_output_fp.open("r", encoding="utf-8") as json_file:
+        json_content = json.load(json_file)
+
+    for error_dict in json_content:
         ruff_err: _RuffJSONError = _RuffJSONError.model_validate(error_dict)
         err_is_on_one_line: bool = ruff_err.location.row == ruff_err.end_location.row
         # Note: github annotations have markdown support -> let's hyperlink the err code
@@ -71,7 +74,7 @@ def format_ruff_json_output(
             start_column=ruff_err.location.column if err_is_on_one_line else None,
             end_line=ruff_err.end_location.row,
             end_column=ruff_err.end_location.column if err_is_on_one_line else None,
-            filepath=ruff_err.filename.relative_to(local_repo_base),
+            path=str(ruff_err.filename.relative_to(local_repo_base)),
             message=ruff_err.message,
             raw_details=raw_details,
             title=title,
