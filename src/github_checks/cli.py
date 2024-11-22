@@ -4,20 +4,20 @@ import logging
 import os
 import pickle
 import sys
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from pathlib import Path
 
 from configargparse import ArgumentParser
 
-from github_checks.formatters.ruff import format_ruff_json_output
+from github_checks.formatters.ruff import format_ruff_check_run_output
 from github_checks.github_api import GitHubChecks
-from github_checks.models import CheckRunConclusion, ChecksAnnotation
+from github_checks.models import CheckRunConclusion, CheckRunOutput
 
-log_to_annotation_formatters: dict[
+LOG_OUTPUT_FORMATTERS: dict[
     str,
-    Callable[[Path, Path], Iterable[ChecksAnnotation]],
+    Callable[[Path, Path], tuple[CheckRunOutput, CheckRunConclusion]],
 ] = {
-    "ruff-json": format_ruff_json_output,
+    "ruff-json": format_ruff_check_run_output,
 }
 
 
@@ -95,44 +95,36 @@ if __name__ == "__main__":
         help="A name for this check run. Will be shown on any respective GitHub PRs.",
     )
 
-    annotation_parser = subparsers.add_parser(
-        "add-check-annotations",
-        help="Update an existing check run with annotations from local validation "
-        "output. These will show up as comments on (where available) the specified "
-        "lines of code in any pull requests with this commit.",
+    finish_parser = subparsers.add_parser(
+        "finish-check-run",
+        help="Finish the currently running check run, posting all the check annotations"
+        ", the surrounding summary output and the appropriate check conclusion.",
     )
-    annotation_parser.add_argument(
+    finish_parser.add_argument(
         "validation_log",
         type=Path,
         help="Logfile of a supported format (see option --format for details).",
     )
-    annotation_parser.add_argument(
+    finish_parser.add_argument(
         "--log-format",
-        choices=log_to_annotation_formatters.keys(),
+        choices=LOG_OUTPUT_FORMATTERS.keys(),
         required=True,
         help="Format of the provided log file.",
     )
-    annotation_parser.add_argument(
+    finish_parser.add_argument(
         "--local-repo-path",
         type=Path,
         env_var="GH_LOCAL_REPO_PATH",
-        required=False,
+        required=True,
         help="Path to the local copy of the repository, for deduction of relative paths"
-        " by the formatter, for any absolute paths contained in the logfile. If not "
-        "provided, it will be assumed to be in the current working directory, under the"
-        " same name as the remote GitHub repository. Throws an error if not.",
-    )
-
-    finish_parser = subparsers.add_parser(
-        "finish-check-run",
-        help="End the currently running check run, posting the appropriate conclusion.",
+        " by the formatter, for any absolute paths contained in the logfile.",
     )
     finish_parser.add_argument(
         "--conclusion",
         choices=CheckRunConclusion,
         required=False,
-        help="Conclusion this check run should finish with, optional. If not provided, "
-        "either success or failure will be used, depending on presence of annotations.",
+        help="Optional override for the conclusion this check run should finish with."
+        "If not provided, success/action_required are used, depending on annotations.",
     )
     finish_parser.add_argument(
         "--no-cleanup",
@@ -182,42 +174,14 @@ if __name__ == "__main__":
         with args.pickle_filepath.open("wb") as pickle_file:
             pickle.dump(gh_checks, pickle_file)
 
-    elif args.command == "add-check-annotations":
-        if not args.pickle_filepath.exists():
-            logging.fatal(
-                "[github-checks] Trying to update a github check, but no check "
-                "is currently running. Aborting.",
-            )
-            sys.exit(-1)
-
-        if not args.local_repo_path:
-            # assume that local repo is named same as remote
-            # try splitting repo URL for last part of path and appending to cwd
-            remote_repo_name: str | None = os.getenv("GH_REPO_BASE_URL", None)
-            if (
-                not remote_repo_name
-                or not (
-                    local_repo_path := (Path().cwd() / remote_repo_name.split("/")[-1])
-                )
-                or not local_repo_path.exists()
-            ):
-                logging.fatal(
-                    "[github-checks] Cannot find local repository copy for resolution "
-                    "of relative paths. Aborting.",
-                )
-                sys.exit("-1")
-
-        annotations = log_to_annotation_formatters[args.log_format](
-            args.validation_log,
-            Path(args.local_repo_path),
-        )
-
-        with args.pickle_filepath.open("rb") as pickle_file:
-            gh_checks = pickle.load(pickle_file)  # noqa: S301
-        gh_checks.update_annotations(list(annotations))
-
     elif args.command == "finish-check-run":
-        if not args.pickle_filepath.exists():
+        if not Path(args.local_repo_path).exists():
+            logging.fatal(
+                "[github-checks] Cannot find local repository copy for resolution "
+                "of relative paths. Aborting.",
+            )
+            sys.exit("-1")
+        if not Path(args.pickle_filepath).exists():
             logging.fatal(
                 "[github-checks] Error: Trying to update a github check, but no check "
                 "is currently running. Quitting.",
@@ -226,7 +190,18 @@ if __name__ == "__main__":
 
         with args.pickle_filepath.open("rb") as pickle_file:
             gh_checks = pickle.load(pickle_file)  # noqa: S301
-        gh_checks.finish_check_run(args.conclusion)
+
+        check_run_output: CheckRunOutput
+        check_run_conclusion: CheckRunConclusion
+        check_run_output, check_run_conclusion = LOG_OUTPUT_FORMATTERS[args.log_format](
+            Path(args.validation_log),
+            Path(args.local_repo_path),
+        )
+        if args.conclusion:
+            # override if present
+            check_run_conclusion = CheckRunConclusion(args.conclusion)
+
+        gh_checks.finish_check_run(check_run_conclusion, check_run_output)
 
         # delete the pickle file for this run, it won't be needed anymore
         args.pickle_filepath.unlink()

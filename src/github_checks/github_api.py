@@ -86,7 +86,7 @@ def _authenticate_as_github_app(  # noqa: PLR0913
 
 
 def _delete_keys_from_nested_dict(dictionary: dict[str, Any]) -> None:
-    for key in dictionary:
+    for key in list(dictionary.keys()):
         if dictionary[key] is None:
             del dictionary[key]
         elif type(dictionary[key]) is dict:
@@ -146,15 +146,6 @@ class GitHubChecks:
         )
         self.gh_api_timeout = gh_api_timeout
 
-    def _gen_github_timestamp(self) -> str:
-        """Generate a timestamp for the current moment in the GitHub-expected format."""
-        return (
-            datetime.now(timezone.utc)
-            .replace(microsecond=0)
-            .isoformat()
-            .replace("+00:00", "Z")
-        )
-
     def start_check_run(
         self,
         revision_sha: str,
@@ -199,57 +190,6 @@ class GitHubChecks:
         self._curr_annotation_levels = set()
         self._curr_annotations_ctr = 0
 
-    def update_annotations(self, annotations: list[ChecksAnnotation]) -> None:
-        """Update the current check run with a list of Checks annotations.
-
-        :param annotations: the Checks annotations
-        :raises HTTPError: in case the GitHub API could not start the check run
-        """
-        if not self.current_run_id:
-            logging.fatal(
-                "[github-checks] Trying to update annotations, but no check is running",
-            )
-            return
-
-        self._curr_annotation_levels.update(
-            annotation.annotation_level for annotation in annotations
-        )
-        self._curr_annotations_ctr += len(annotations)
-
-        for annotations_chunk in self._annotation_batches(annotations):
-            post_body: CheckRunUpdatePOSTBody = CheckRunUpdatePOSTBody(
-                output=CheckRunOutput(
-                    title=self._curr_check_name,
-                    summary=f"Check {self._curr_check_name} completed, "
-                    f"found {self._curr_annotations_ctr} issues.",
-                    annotations=annotations_chunk,
-                ),
-            )
-            post_body_json = post_body.model_dump_json(
-                exclude_unset=True,
-                exclude_none=True,
-            )
-            post_body_dict = json.loads(post_body_json)
-            _delete_keys_from_nested_dict(post_body_dict)
-
-            logging.warning(json.dumps(post_body_dict))
-            response: Response = self._github_session.patch(
-                f"{self.repo_base_url}/check-runs/{self.current_run_id}",
-                json=post_body_dict,
-                headers=self._api_headers,
-                timeout=self.gh_api_timeout,
-            )
-            response.raise_for_status()
-
-    @staticmethod
-    def _annotation_batches(
-        annotations: list[ChecksAnnotation],
-        batch_size: int = 50,
-    ) -> Iterable[list[ChecksAnnotation]]:
-        """Chunk the annotations, as GitHub API accepts <= 50 annotations at once."""
-        for i in range(0, len(annotations), batch_size):
-            yield annotations[i : i + batch_size]
-
     def finish_check_run(
         self,
         conclusion: CheckRunConclusion | None = None,
@@ -271,29 +211,80 @@ class GitHubChecks:
             return
 
         if not output:
+            # set a minimal output, in case e.g. only a conclusion was passed
             output = CheckRunOutput(
                 title=self._curr_check_name,
                 summary=f"Check {self._curr_check_name} completed, "
                 f"found {self._curr_annotations_ctr} issues.",
             )
+
         if not conclusion:
-            conclusion = (
-                CheckRunConclusion.ACTION_REQUIRED
-                if AnnotationLevel.FAILURE in self._curr_annotation_levels
-                else CheckRunConclusion.SUCCESS
-            )
+            if output.annotations:
+                conclusion = self._infer_conclusion(output.annotations)
+            else:
+                conclusion = CheckRunConclusion.NEUTRAL
+
+        if not output.annotations:
+            self._post_check_run_update(output, conclusion)
+        else:
+            for annotations_chunk in self._annotation_batches(output.annotations):
+                output.annotations = annotations_chunk
+                self._post_check_run_update(output, conclusion)
+
+        self.current_run_id = None
+
+    def _post_check_run_update(
+        self,
+        output: CheckRunOutput,
+        conclusion: CheckRunConclusion,
+    ) -> None:
         json_payload: CheckRunUpdatePOSTBody = CheckRunUpdatePOSTBody(
             name=self._curr_check_name,
             completed_at=self._gen_github_timestamp(),
             output=output,
             conclusion=conclusion.value,
         )
+
+        # Get rid of any null values, as they cause HTTP Status 422 errors at the API
+        post_body_json = json_payload.model_dump_json(
+            exclude_unset=True,
+            exclude_none=True,
+        )
+        post_body_dict = json.loads(post_body_json)
+        _delete_keys_from_nested_dict(post_body_dict)
+
         response: Response = self._github_session.patch(
             f"{self.repo_base_url}/check-runs/{self.current_run_id}",
-            json=json_payload.model_dump(exclude_unset=True, exclude_none=True),
+            json=post_body_dict,
             headers=self._api_headers,
             timeout=self.gh_api_timeout,
         )
         response.raise_for_status()
 
-        self.current_run_id = None
+    @staticmethod
+    def _annotation_batches(
+        annotations: list[ChecksAnnotation],
+        batch_size: int = 50,
+    ) -> Iterable[list[ChecksAnnotation]]:
+        """Chunk the annotations, as GitHub API accepts <= 50 annotations at once."""
+        for i in range(0, len(annotations), batch_size):
+            yield annotations[i : i + batch_size]
+
+    def _infer_conclusion(
+        self,
+        annotations: list[ChecksAnnotation],
+    ) -> CheckRunConclusion:
+        annotation_levels = {annotation.annotation_level for annotation in annotations}
+        if AnnotationLevel.FAILURE in annotation_levels:
+            return CheckRunConclusion.ACTION_REQUIRED
+        # both warning and notice should not block a pull request, but just inform
+        return CheckRunConclusion.SUCCESS
+
+    def _gen_github_timestamp(self) -> str:
+        """Generate a timestamp for the current moment in the GitHub-expected format."""
+        return (
+            datetime.now(timezone.utc)
+            .replace(microsecond=0)
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
