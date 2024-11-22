@@ -232,7 +232,6 @@ class GitHubChecks:
             post_body_dict = json.loads(post_body_json)
             _delete_keys_from_nested_dict(post_body_dict)
 
-            logging.warning(json.dumps(post_body_dict))
             response: Response = self._github_session.patch(
                 f"{self.repo_base_url}/check-runs/{self.current_run_id}",
                 json=post_body_dict,

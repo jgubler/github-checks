@@ -215,6 +215,8 @@ if __name__ == "__main__":
         with args.pickle_filepath.open("rb") as pickle_file:
             gh_checks = pickle.load(pickle_file)  # noqa: S301
         gh_checks.update_annotations(list(annotations))
+        with args.pickle_filepath.open("wb") as pickle_file:
+            pickle.dump(gh_checks, pickle_file)
 
     elif args.command == "finish-check-run":
         if not args.pickle_filepath.exists():

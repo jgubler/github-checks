@@ -2,10 +2,10 @@
 
 # set up environment variables up front
 export GH_APP_ID="1065841" GH_APP_INSTALL_ID="57443831"
-export GH_PRIVATE_KEY_PEM="<>"
+export GH_PRIVATE_KEY_PEM="/home/jgubler-wsl/.ssh/demo-github-checks-app.pem"
 export GH_REPO_BASE_URL="https://github.com/jgubler/github-checks"
 export GH_CHECK_REVISION="$(git rev-parse HEAD)"
-export GH_LOCAL_REPO_PATH="~/repos/github-checks"
+export GH_LOCAL_REPO_PATH="/home/jgubler-wsl/repos/github-checks"
 
 # set up a venv, and install this package in it, including dev dependencies
 # ideally we'll split CI dependencies from dev dependencies at some point
