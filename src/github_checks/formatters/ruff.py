@@ -7,7 +7,12 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from github_checks.models import AnnotationLevel, ChecksAnnotation
+from github_checks.models import (
+    AnnotationLevel,
+    CheckRunConclusion,
+    CheckRunOutput,
+    ChecksAnnotation,
+)
 
 
 class _CodePosition(BaseModel):
@@ -39,9 +44,10 @@ class _RuffJSONError(BaseModel):
     url: str
 
 
-def format_ruff_json_output(
+def _format_annotations_for_ruff_json_output(
     json_output_fp: Path,
     local_repo_base: Path,
+    annotation_level: AnnotationLevel,
 ) -> Iterable[ChecksAnnotation]:
     """Generate annotations for the ruff's output when run with output-format=json.
 
@@ -56,20 +62,20 @@ def format_ruff_json_output(
         err_is_on_one_line: bool = ruff_err.location.row == ruff_err.end_location.row
         # Note: github annotations have markdown support -> let's hyperlink the err code
         # this will look like "D100: undocumented public module" with the D100 clickable
-        title: str = f"[{ruff_err.code}]({ruff_err.url}): {ruff_err.url.split('/')[-1]}"
+        title: str = f"[{ruff_err.code}] {ruff_err.url.split('/')[-1]}"
         raw_details: str | None = None
         if ruff_err.fix:
             raw_details = (
-                "Ruff suggests the following fix: {ruff_err.fix.message}\n"
+                f"Ruff suggests the following fix: {ruff_err.fix.message}\n"
                 + "\n".join(
                     f"Replace line {edit.location.row}, column {edit.location.column} "
-                    "to line {edit.end_location.row}, column {edit.end_location.column}"
-                    " with:\n{edit.content}"
+                    f"to line {edit.end_location.row}, column "
+                    f"{edit.end_location.column} with:\n{edit.content}"
                     for edit in ruff_err.fix.edits
                 )
             )
         yield ChecksAnnotation(
-            annotation_level=AnnotationLevel.FAILURE,
+            annotation_level=annotation_level,
             start_line=ruff_err.location.row,
             start_column=ruff_err.location.column if err_is_on_one_line else None,
             end_line=ruff_err.end_location.row,
@@ -79,3 +85,52 @@ def format_ruff_json_output(
             raw_details=raw_details,
             title=title,
         )
+
+
+def format_ruff_check_run_output(
+    json_output_fp: Path,
+    local_repo_base: Path,
+) -> tuple[CheckRunOutput, CheckRunConclusion]:
+    """Generate high level results, to be shown on the "Checks" tab."""
+    with json_output_fp.open("r", encoding="utf-8") as json_file:
+        json_content = json.load(json_file)
+
+    issues: list[str] = []
+    issue_codes: set[str] = set()
+    for ruff_err_json in json_content:
+        ruff_err = _RuffJSONError.model_validate(ruff_err_json)
+        if ruff_err.code in issue_codes:
+            continue
+        issues.append(
+            f"> **[[{ruff_err.code}]({ruff_err.url})] {ruff_err.url.split('/')[-1]}**",
+        )
+
+    # Use warning level for annotations (since nothing broke, but still needs fixing)
+    annotations: list[ChecksAnnotation] = list(
+        _format_annotations_for_ruff_json_output(
+            json_output_fp,
+            local_repo_base,
+            AnnotationLevel.WARNING,
+        ),
+    )
+    # be strict with the conclusion - disapprove if there are any ruff errors whatsoever
+    if annotations:
+        conclusion = CheckRunConclusion.ACTION_REQUIRED
+        title = (
+            f"Ruff found {len(issue_codes)} issues. "
+            "PR cannot be merged until they are fixed."
+        )
+        summary: str = (
+            "Ruff found the following issues:\n" + "\n".join(issues) + "\n\n"
+            "Click the error codes to check out why ruff thinks these are bad, or go "
+            "to the source files to check out the annotations on the offending code."
+        )
+    else:
+        conclusion = CheckRunConclusion.SUCCESS
+        title = "Ruff found no issues. Approving PR."
+        summary = "Nice work!"
+
+    return (
+        CheckRunOutput(title=title, summary=summary, annotations=annotations),
+        conclusion,
+    )
