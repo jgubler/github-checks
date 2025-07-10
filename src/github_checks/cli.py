@@ -9,6 +9,7 @@ from pathlib import Path
 
 from configargparse import ArgumentParser
 
+from github_checks.formatters.mypy import format_mypy_check_run_output
 from github_checks.formatters.ruff import format_ruff_check_run_output
 from github_checks.github_api import GitHubChecks
 from github_checks.models import CheckRunConclusion, CheckRunOutput
@@ -18,6 +19,7 @@ LOG_OUTPUT_FORMATTERS: dict[
     Callable[[Path, Path], tuple[CheckRunOutput, CheckRunConclusion]],
 ] = {
     "ruff-json": format_ruff_check_run_output,
+    "mypy-json": format_mypy_check_run_output,
 }
 
 
@@ -203,11 +205,12 @@ if __name__ == "__main__":
 
         gh_checks.finish_check_run(check_run_conclusion, check_run_output)
 
-        # delete the pickle file for this run, it won't be needed anymore
-        args.pickle_filepath.unlink()
-
         # unless disabled, clean up local environment variables
         if not args.no_cleanup:
+            # delete the pickle file, the config won't be needed anymore
+            args.pickle_filepath.unlink()
+
+            # delete all environment variables for good measure
             for env_var in [
                 "GH_APP_ID",
                 "GH_APP_INSTALL_ID",

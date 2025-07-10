@@ -74,6 +74,9 @@ def _format_annotations_for_ruff_json_output(
                     for edit in ruff_err.fix.edits
                 )
             )
+        message = (
+            ruff_err.message + "\n\n" + "See " + ruff_err.url + " for more information."
+        )
         yield CheckAnnotation(
             annotation_level=annotation_level,
             start_line=ruff_err.location.row,
@@ -81,7 +84,7 @@ def _format_annotations_for_ruff_json_output(
             end_line=ruff_err.end_location.row,
             end_column=ruff_err.end_location.column if err_is_on_one_line else None,
             path=str(ruff_err.filename.relative_to(local_repo_base)),
-            message=ruff_err.message,
+            message=message,
             raw_details=raw_details,
             title=title,
         )
@@ -101,6 +104,9 @@ def format_ruff_check_run_output(
         ruff_err = _RuffJSONError.model_validate(ruff_err_json)
         if ruff_err.code in issue_codes:
             continue
+        issue_codes.add(ruff_err.code)
+        # Note: github annotations have markdown support -> let's hyperlink the err code
+        # this will look like "D100: undocumented public module" with the D100 clickable
         issues.append(
             f"> **[[{ruff_err.code}]({ruff_err.url})] {ruff_err.url.split('/')[-1]}**",
         )
@@ -116,10 +122,7 @@ def format_ruff_check_run_output(
     # be strict with the conclusion - disapprove if there are any ruff errors whatsoever
     if annotations:
         conclusion = CheckRunConclusion.ACTION_REQUIRED
-        title = (
-            f"Ruff found {len(issue_codes)} issues. "
-            "PR cannot be merged until they are fixed."
-        )
+        title = f"Ruff found {len(issue_codes)} issues."
         summary: str = (
             "Ruff found the following issues:\n" + "\n".join(issues) + "\n\n"
             "Click the error codes to check out why ruff thinks these are bad, or go "
@@ -127,7 +130,7 @@ def format_ruff_check_run_output(
         )
     else:
         conclusion = CheckRunConclusion.SUCCESS
-        title = "Ruff found no issues. Approving PR."
+        title = "Ruff found no issues."
         summary = "Nice work!"
 
     return (
