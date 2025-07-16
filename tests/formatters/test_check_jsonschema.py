@@ -41,7 +41,7 @@ def test_format_check_jsonschema_check_run_output_with_issues() -> None:
 
     output, conclusion = format_jsonschema_check_run_output(
         sample_output_fp,
-        Path(__name__).parent,
+        Path(__file__).parent.parent.parent,
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.ACTION_REQUIRED

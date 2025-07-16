@@ -14,10 +14,11 @@ def sample_raw_output(repo_root: Path, raw_out_fp: Path) -> None:
 
 def test_format_raw_check_run_output_with_issues() -> None:
     sample_output_fp = Path(tempfile.NamedTemporaryFile(delete=False).name)
-    sample_raw_output(Path(__file__).parent, sample_output_fp)
+    sample_raw_output(Path(__file__).parent.parent.parent, sample_output_fp)
     output, conclusion = format_raw_check_run_output(
         sample_output_fp,
-        Path(__file__).parent,
+        Path(__file__).parent.parent.parent
+,
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.ACTION_REQUIRED
