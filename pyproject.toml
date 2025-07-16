@@ -25,6 +25,7 @@ classifiers = [
 dev = [
     "bandit",
     "black",
+    "check-jsonschema",
     "isort",
     "mypy",
     "pre-commit",
