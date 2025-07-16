@@ -2,7 +2,7 @@
 
 # set up environment variables up front
 export GH_APP_ID="1065841" GH_APP_INSTALL_ID="57443831"
-export GH_PRIVATE_KEY_PEM="<>"
+export GH_PRIVATE_KEY_PEM="/Users/jgubler/.ssh/demo-github-checks-app-pkcs8.pem"
 export GH_REPO_BASE_URL="https://github.com/jgubler/github-checks"
 export GH_CHECK_REVISION="$(git rev-parse HEAD)"
 export GH_LOCAL_REPO_PATH="/Users/jgubler/repos/github-checks"
@@ -29,7 +29,16 @@ python3 -m github_checks.cli start-check-run --check-name mypy-checks
 mypy . --output=json > mypy_output.json
 
 # finish the check run, passing mypy's errors as annotations to GitHub
-python3 -m github_checks.cli finish-check-run mypy_output.json --log-format mypy-json
+python3 -m github_checks.cli finish-check-run mypy_output.json --log-format mypy-json --no-cleanup
+
+
+python3 -m github_checks.cli start-check-run --check-name raw-checks
+
+# run mypy on ourselves
+echo "I just don't like this code" > raw_output.json
+
+# finish the check run, passing mypy's errors as annotations to GitHub
+python3 -m github_checks.cli finish-check-run raw_output.json --log-format raw
 
 # clean up the venv
 deactivate

@@ -48,7 +48,7 @@ def format_mypy_check_run_output(
             json.loads(line) for line in json_file.readlines() if line.strip()
         ]  # mypy outputs one JSON object per line
 
-    annotations = []
+    annotations: list[CheckAnnotation] = []
     issue_codes = set()
     for error_dict in json_content:
         mypy_err: _MyPyJSONError = _MyPyJSONError.model_validate(error_dict)
@@ -62,7 +62,7 @@ def format_mypy_check_run_output(
         annotation_level = (
             AnnotationLevel.NOTICE
             if mypy_err.severity == _MyPySeverity.NOTE
-            else AnnotationLevel.FAILURE
+            else AnnotationLevel.WARNING
         )
         annotations.append(
             CheckAnnotation(
@@ -81,7 +81,7 @@ def format_mypy_check_run_output(
     if annotations:
         conclusion = (
             CheckRunConclusion.ACTION_REQUIRED
-            if any(a.annotation_level == AnnotationLevel.FAILURE for a in annotations)
+            if any(a.annotation_level != AnnotationLevel.NOTICE for a in annotations)
             else CheckRunConclusion.SUCCESS
         )
         title = f"Mypy found {len(issue_codes)} distinct issues."

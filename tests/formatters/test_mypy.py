@@ -59,5 +59,5 @@ def test_format_mypy_check_run_output_no_issues() -> None:
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.SUCCESS
     assert "Mypy found no issues" in output.title
-    assert output.summary == "Mypy found no issues."
+    assert output.summary == "Nice work!"
     assert len(output.annotations) == 0
