@@ -31,10 +31,15 @@ python3 -m github_checks.cli start-check-run --check-name test-raw-checks
 echo "I just don't like this code" > raw_output.json
 python3 -m github_checks.cli finish-check-run raw_output.json --log-format raw --no-cleanup
 
-# random raw output to test the raw log format
+# run the jsonschema checks on an example file for testing
 python3 -m github_checks.cli start-check-run --check-name test-jsonschema-checks
 check-jsonschema -o json --schemafile tests/json_validation/user.schema.json tests/json_validation/invalid_user.json > jsonschema_output.json
-python3 -m github_checks.cli finish-check-run jsonschema_output.json --log-format check-jsonschema
+python3 -m github_checks.cli finish-check-run jsonschema_output.json --log-format check-jsonschema --no-cleanup
+
+# run the sarif checks on ourselves via ruff
+python3 -m github_checks.cli start-check-run --check-name sarif-checks
+ruff check . --output-format=sarif > sarif_output.json
+python3 -m github_checks.cli finish-check-run sarif_output.json --log-format sarif
 
 # clean up the venv
 deactivate

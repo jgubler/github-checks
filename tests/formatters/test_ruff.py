@@ -4,7 +4,7 @@ from pathlib import Path
 from github_checks.formatters.ruff import format_ruff_check_run_output
 from github_checks.models import CheckRunConclusion, CheckRunOutput, AnnotationLevel
 
-REPO_ROOT = Path(__name__).parent
+REPO_ROOT = Path(__file__).parent.parent.parent
 RUFF_OUTPUT = [
     {
         "cell": None,
@@ -41,7 +41,7 @@ def test_format_ruff_check_run_output_with_issues() -> None:
 
     output, conclusion = format_ruff_check_run_output(
         sample_output_fp,
-        Path(__name__).parent,
+        REPO_ROOT,
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.ACTION_REQUIRED
@@ -60,7 +60,7 @@ def test_format_ruff_check_run_output_no_issues() -> None:
     empty_json_fp = Path(tempfile.NamedTemporaryFile(delete=False).name)
     empty_json_fp.write_text("[]")
     output, conclusion = format_ruff_check_run_output(
-        empty_json_fp, Path(__name__).parent
+        empty_json_fp, REPO_ROOT
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.SUCCESS

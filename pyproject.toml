@@ -15,6 +15,7 @@ dependencies = [
     "pydantic",
     "requests",
     "configargparse",
+    "pysarif",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -30,7 +31,6 @@ dev = [
     "mypy",
     "pre-commit",
     "pycodestyle",
-    "pydantic",
     "pydocstyle",
     "pytest",
     "ruff",

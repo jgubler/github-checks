@@ -122,11 +122,12 @@ def format_ruff_check_run_output(
     # be strict with the conclusion - disapprove if there are any ruff errors whatsoever
     if annotations:
         conclusion = CheckRunConclusion.ACTION_REQUIRED
-        title = f"Ruff found {len(issue_codes)} issues."
+        title = f"Ruff found issues with {len(issue_codes)} rules."
         summary: str = (
-            "Ruff found the following issues:\n" + "\n".join(issues) + "\n\n"
-            "Click the error codes to check out why ruff thinks these are bad, or go "
-            "to the source files to check out the annotations on the offending code."
+            "\n".join(issues) + "\n\n"
+            "Click the error codes to read ruff's documentation for these rules, or "
+            "navigate to the source files via the annotations below to see the "
+            "offending code."
         )
     else:
         conclusion = CheckRunConclusion.SUCCESS

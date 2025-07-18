@@ -35,7 +35,8 @@ def test_format_mypy_check_run_output_with_issues() -> None:
     sample_output_fp = Path(tempfile.NamedTemporaryFile(delete=False).name)
     sample_mypy_output(Path(__file__).parent, sample_output_fp)
     output, conclusion = format_mypy_check_run_output(
-        sample_output_fp, Path(__file__).parent
+        sample_output_fp, Path(__file__).parent.parent.parent
+
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.ACTION_REQUIRED
