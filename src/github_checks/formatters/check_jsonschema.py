@@ -5,6 +5,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from github_checks.formatters.utils import filter_for_checksignore, get_conclusion
 from github_checks.models import (
     AnnotationLevel,
     CheckAnnotation,
@@ -57,7 +58,9 @@ def get_err_loc(filename: Path, path: str) -> tuple[int, int, int]:
 
 def format_jsonschema_check_run_output(
     json_output_fp: Path,
-    _: Path,
+    local_repo_base: Path,
+    ignore_globs: list[str] | None,
+    ignore_verdict_only: bool,
 ) -> tuple[CheckRunOutput, CheckRunConclusion]:
     """Generate high level results, to be shown on the "Checks" tab."""
     with json_output_fp.open("r", encoding="utf-8") as json_file:
@@ -73,6 +76,7 @@ def format_jsonschema_check_run_output(
         json_err: _CheckJsonSchemaError = _CheckJsonSchemaError.model_validate(
             error_dict,
         )
+
         err_line, err_start_column, err_end_column = get_err_loc(
             Path(json_err.filename),
             json_err.path,
@@ -93,16 +97,39 @@ def format_jsonschema_check_run_output(
             ),
         )
 
+    # Filter out ignored files from the verdict / annotations (depending on settings)
+    if ignore_globs:
+        filtered_annotations: list[CheckAnnotation] = list(
+            filter_for_checksignore(
+                annotations,
+                ignore_globs,
+                local_repo_base,
+            )
+        )
+        conclusion = get_conclusion(filtered_annotations)
+        if not ignore_verdict_only:
+            annotations = filtered_annotations
+    else:
+        conclusion = get_conclusion(annotations)
+
     if annotations:
-        title = f"JSON Schema validation found {len(annotations)} issues"
-        summary = "The JSON schema validation found issues in JSON/YAML files."
-        conclusion = CheckRunConclusion.ACTION_REQUIRED
+        if conclusion == CheckRunConclusion.ACTION_REQUIRED:
+            title = f"JSON Schema validation found {len(annotations)} issues"
+            summary = (
+                "The schema validation found the following issues in JSON/YAML files:"
+            )
+        else:
+            title = "JSON Schema validation only found issues in ignored files"
+            summary = (
+                "The JSON schema validation found issues in JSON/YAML files. "
+                "See the annotations below for details."
+            )
     else:
         title = "JSON Schema validation found no issues"
         summary = (
             "The JSON schema validation did not find any issues in JSON/YAML files."
         )
-        conclusion = CheckRunConclusion.SUCCESS
+
     return (
         CheckRunOutput(
             title=title,

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from github_checks.formatters.utils import filter_for_checksignore, get_conclusion
 from github_checks.models import (
     AnnotationLevel,
     CheckAnnotation,
@@ -40,7 +41,9 @@ class _MyPyJSONError(BaseModel):
 
 def format_mypy_check_run_output(
     json_output_fp: Path,
-    _: Path,
+    local_repo_base: Path,
+    ignore_globs: list[str] | None = None,
+    ignore_verdict_only: bool = False,
 ) -> tuple[CheckRunOutput, CheckRunConclusion]:
     """Generate high level results, to be shown on the "Checks" tab."""
     with json_output_fp.open("r", encoding="utf-8") as json_file:
@@ -78,13 +81,22 @@ def format_mypy_check_run_output(
         )
         issue_codes.add(mypy_err.code)
 
-    if annotations:
-        conclusion = (
-            CheckRunConclusion.ACTION_REQUIRED
-            if any(a.annotation_level != AnnotationLevel.NOTICE for a in annotations)
-            else CheckRunConclusion.SUCCESS
+    # Filter out ignored files from the verdict / annotations (depending on settings)
+    if ignore_globs:
+        filtered_annotations: list[CheckAnnotation] = list(
+            filter_for_checksignore(
+                annotations,
+                ignore_globs,
+                local_repo_base,
+            )
         )
-        title = f"Mypy found {len(issue_codes)} distinct issues."
+        conclusion = get_conclusion(filtered_annotations)
+        if not ignore_verdict_only:
+            annotations = filtered_annotations
+    else:
+        conclusion = get_conclusion(annotations)
+
+    if annotations:
         issues_text = "\n".join(
             f"> **[[{code}]({MYPY_ISSUE_CODE_URL_BASE + code})]**"
             for code in issue_codes
@@ -94,8 +106,12 @@ def format_mypy_check_run_output(
             "Click the error codes to check out why mypy thinks these are bad, or go "
             "to the source files to check out the annotations on the offending code."
         )
+        if conclusion == CheckRunConclusion.ACTION_REQUIRED:
+            title = f"Mypy found {len(issue_codes)} distinct issues."
+        else:
+            title = "Mypy only found issues in ignored files."
+
     else:
-        conclusion = CheckRunConclusion.SUCCESS
         title = "Mypy found no issues."
         summary = "Nice work!"
 

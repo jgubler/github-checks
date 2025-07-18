@@ -1,4 +1,4 @@
-"""Formatter to process ruff output and yield GitHub annotations."""
+"""Formatter to process SARIF output and yield GitHub annotations."""
 
 import json
 from collections.abc import Iterable
@@ -6,6 +6,7 @@ from pathlib import Path
 
 from pysarif import load_from_dict
 
+from github_checks.formatters.utils import filter_for_checksignore, get_conclusion
 from github_checks.models import (
     AnnotationLevel,
     CheckAnnotation,
@@ -19,9 +20,9 @@ def _format_annotations_for_sarif_json_output(
     local_repo_base: Path,
     annotation_level: AnnotationLevel,
 ) -> Iterable[CheckAnnotation]:
-    """Generate annotations for the ruff's output when run with output-format=json.
+    """Generate annotations for any SARIF json output.
 
-    :param json_output_fp: filepath to the full json output from ruff
+    :param json_output_fp: filepath to the full SARIF json output
     :param local_repo_base: local repository base path, for deriving repo-relative paths
     """
     with json_output_fp.open("r", encoding="utf-8") as json_file:
@@ -77,6 +78,8 @@ def _format_annotations_for_sarif_json_output(
 def format_sarif_check_run_output(
     json_output_fp: Path,
     local_repo_base: Path,
+    ignore_globs: list[str] | None = None,
+    ignore_verdict_only: bool = False,
 ) -> tuple[CheckRunOutput, CheckRunConclusion]:
     """Generate high level results, to be shown on the "Checks" tab."""
     with json_output_fp.open("r", encoding="utf-8") as json_file:
@@ -117,14 +120,33 @@ def format_sarif_check_run_output(
         for rule in sarif_output.runs[0].tool.driver.rules
     ]
 
-    # be strict with the conclusion - disapprove if there are any ruff errors whatsoever
-    conclusion = CheckRunConclusion.ACTION_REQUIRED
-    title = f"{tool_name} found issues with {len(issues)} rules."
-    summary: str = (
-        "\n".join(issues) + "\n\n"
-        "Navigate to the source files via the annotations below to see the offending "
-        "code."
-    )
+    # Filter out ignored files from the verdict / annotations (depending on settings)
+    if ignore_globs:
+        filtered_annotations: list[CheckAnnotation] = list(
+            filter_for_checksignore(
+                annotations,
+                ignore_globs,
+                local_repo_base,
+            ),
+        )
+        conclusion = get_conclusion(filtered_annotations)
+        if not ignore_verdict_only:
+            annotations = filtered_annotations
+    else:
+        conclusion = get_conclusion(annotations)
+
+    if annotations:
+        summary: str = (
+            "\n".join(issues) + "\n\n"
+            "Navigate to the source files via the annotations below to see the "
+            "offending code."
+        )
+        if conclusion == CheckRunConclusion.ACTION_REQUIRED:
+            title = f"{tool_name} found issues with {len(issues)} rules."
+        elif annotations:
+            title = f"{tool_name} only found issues in ignored files."
+    else:
+        title = f"{tool_name} found no issues."
 
     return (
         CheckRunOutput(title=title, summary=summary, annotations=annotations),

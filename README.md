@@ -76,3 +76,16 @@ gh_checks.finish_check_run(
 ## How to initiate the Checks
 Depending on your build environment and if it has an integration with GitHub, you may be able to use a direct "pull request trigger" to run your builds, which then perform & upload the checks.
 However, note that GitHub Apps can also be configured to trigger webhooks based on the events of the repository they're connected to. This may be useful, as this will e.g. also allow you to use the "Re-Run Checks" functionality in the GitHub PR web interface, which will then re-trigger that webhook.
+
+# Future Work
+
+Add support for:
+* pytest
+* bandit
+* pyroma
+* vulture
+* black
+* shellcheck
+
+Other features:
+* Allow checks to run in parallel (likely using sqlite instead of a pickle file)

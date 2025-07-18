@@ -29,6 +29,7 @@ dev = [
     "check-jsonschema",
     "isort",
     "mypy",
+    "pathspec",
     "pre-commit",
     "pycodestyle",
     "pydocstyle",
@@ -42,7 +43,7 @@ line-length = 88
 output-format = "grouped"
 src = ["src"]
 target-version = "py310"
-exclude = ["__init__.py", ".venv", "tests"]
+exclude = ["__init__.py", ".venv"]
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -91,7 +92,6 @@ follow_imports = "skip"
 disallow_subclassing_any = false
 exclude = [
     "build",
-    "tests",
 ]
 
 [tool.pytest.ini_options]
