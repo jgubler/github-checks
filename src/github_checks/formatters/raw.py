@@ -11,6 +11,8 @@ from github_checks.models import (
 def format_raw_check_run_output(
     output_fp: Path,
     _: Path,
+    __: list[str] | None = None,
+    ___: bool = False,
 ) -> tuple[CheckRunOutput, CheckRunConclusion]:
     """Generate output for raw checks, to be shown on the "Checks" tab."""
     if not output_fp.exists():

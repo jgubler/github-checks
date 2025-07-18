@@ -7,6 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from github_checks.formatters.utils import filter_for_checksignore, get_conclusion
 from github_checks.models import (
     AnnotationLevel,
     CheckAnnotation,
@@ -29,7 +30,7 @@ class _RuffEditSuggestion(BaseModel):
 class _RuffFixSuggestion(BaseModel):
     applicability: str
     edits: list[_RuffEditSuggestion]
-    message: str
+    message: str | None
 
 
 class _RuffJSONError(BaseModel):
@@ -65,14 +66,12 @@ def _format_annotations_for_ruff_json_output(
         title: str = f"[{ruff_err.code}] {ruff_err.url.split('/')[-1]}"
         raw_details: str | None = None
         if ruff_err.fix:
-            raw_details = (
-                f"Ruff suggests the following fix: {ruff_err.fix.message}\n"
-                + "\n".join(
-                    f"Replace line {edit.location.row}, column {edit.location.column} "
-                    f"to line {edit.end_location.row}, column "
-                    f"{edit.end_location.column} with:\n{edit.content}"
-                    for edit in ruff_err.fix.edits
-                )
+            msg = ruff_err.fix.message or ""
+            raw_details = f"Ruff suggests the following fix: {msg}\n" + "\n".join(
+                f"Replace line {edit.location.row}, column {edit.location.column} "
+                f"to line {edit.end_location.row}, column "
+                f"{edit.end_location.column} with:\n{edit.content}"
+                for edit in ruff_err.fix.edits
             )
         message = (
             ruff_err.message + "\n\n" + "See " + ruff_err.url + " for more information."
@@ -93,12 +92,14 @@ def _format_annotations_for_ruff_json_output(
 def format_ruff_check_run_output(
     json_output_fp: Path,
     local_repo_base: Path,
+    ignore_globs: list[str] | None = None,
+    ignore_verdict_only: bool = False,
 ) -> tuple[CheckRunOutput, CheckRunConclusion]:
     """Generate high level results, to be shown on the "Checks" tab."""
     with json_output_fp.open("r", encoding="utf-8") as json_file:
         json_content = json.load(json_file)
 
-    issues: list[str] = []
+    issues: set[str] = set()
     issue_codes: set[str] = set()
     for ruff_err_json in json_content:
         ruff_err = _RuffJSONError.model_validate(ruff_err_json)
@@ -107,7 +108,7 @@ def format_ruff_check_run_output(
         issue_codes.add(ruff_err.code)
         # Note: github annotations have markdown support -> let's hyperlink the err code
         # this will look like "D100: undocumented public module" with the D100 clickable
-        issues.append(
+        issues.add(
             f"> **[[{ruff_err.code}]({ruff_err.url})] {ruff_err.url.split('/')[-1]}**",
         )
 
@@ -119,10 +120,27 @@ def format_ruff_check_run_output(
             AnnotationLevel.WARNING,
         ),
     )
-    # be strict with the conclusion - disapprove if there are any ruff errors whatsoever
+
+    # Filter out ignored files from the verdict / annotations (depending on settings)
+    if ignore_globs:
+        filtered_annotations: list[CheckAnnotation] = list(
+            filter_for_checksignore(
+                annotations,
+                ignore_globs,
+                local_repo_base,
+            )
+        )
+        conclusion = get_conclusion(filtered_annotations)
+        if not ignore_verdict_only:
+            annotations = filtered_annotations
+    else:
+        conclusion = get_conclusion(annotations)
+
     if annotations:
-        conclusion = CheckRunConclusion.ACTION_REQUIRED
-        title = f"Ruff found issues with {len(issue_codes)} rules."
+        if conclusion == CheckRunConclusion.ACTION_REQUIRED:
+            title = f"Ruff found issues with {len(issue_codes)} rules."
+        else:
+            title = "Ruff only found issues in ignored files."
         summary: str = (
             "\n".join(issues) + "\n\n"
             "Click the error codes to read ruff's documentation for these rules, or "
@@ -130,7 +148,6 @@ def format_ruff_check_run_output(
             "offending code."
         )
     else:
-        conclusion = CheckRunConclusion.SUCCESS
         title = "Ruff found no issues."
         summary = "Nice work!"
 

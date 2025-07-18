@@ -19,7 +19,10 @@ from github_checks.models import CheckRunConclusion, CheckRunOutput
 
 LOG_OUTPUT_FORMATTERS: dict[
     str,
-    Callable[[Path, Path], tuple[CheckRunOutput, CheckRunConclusion]],
+    Callable[
+        [Path, Path, list[str] | None, bool],
+        tuple[CheckRunOutput, CheckRunConclusion],
+    ],
 ] = {
     "check-jsonschema": format_jsonschema_check_run_output,
     "ruff-json": format_ruff_check_run_output,
@@ -135,14 +138,26 @@ if __name__ == "__main__":
         "If not provided, success/action_required are used, depending on annotations.",
     )
     finish_parser.add_argument(
-        "--no-cleanup",
-        action="store_true",
-        help="Don't clean up local environment variables. Note: Only use this if you "
-        "plan to run another checks run in this environment. Otherwise, sensitive "
-        "information is left on the local file system (e.g. access token), which can "
-        "pose a security risk.",
+        "--checksignore-filepath",
+        type=Path,
+        help="File containing a list of file patterns to ignore for check annotations "
+        "and the check verdict. Useful to incrementally introduce checks to an existing"
+        " codebase, where some files are not yet compliant with the checks.",
     )
-
+    finish_parser.add_argument(
+        "--checksignore-verdict-only",
+        action="store_true",
+        help="If set, only the check verdict will be affected by the checksignore file,"
+        "but annotations will still be generated for these files.",
+    )
+    subparsers.add_parser(
+        "cleanup",
+        help="Clean up the local environment variables and"
+        " the pickle file, if present. Recommended to use if you don't"
+        " plan to run another checks run in this environment. Otherwise, sensitive"
+        " information is left on the local file system (e.g. access token), which can"
+        " pose a security risk.",
+    )
     args = argparser.parse_args(sys.argv[1:])
     gh_checks: GitHubChecks
 
@@ -199,11 +214,18 @@ if __name__ == "__main__":
         with args.pickle_filepath.open("rb") as pickle_file:
             gh_checks = pickle.load(pickle_file)  # noqa: S301
 
+        ignored_globs: list[str] | None = None
+        if args.checksignore_filepath and args.checksignore_filepath.exists():
+            with args.checksignore_filepath.open("r", encoding="utf-8") as ignore_file:
+                ignored_globs = ignore_file.readlines()
+
         check_run_output: CheckRunOutput
         check_run_conclusion: CheckRunConclusion
         check_run_output, check_run_conclusion = LOG_OUTPUT_FORMATTERS[args.log_format](
             Path(args.validation_log),
             Path(args.local_repo_path),
+            ignored_globs,
+            args.checksignore_verdict_only,
         )
         if args.conclusion:
             # override if present
@@ -211,18 +233,18 @@ if __name__ == "__main__":
 
         gh_checks.finish_check_run(check_run_conclusion, check_run_output)
 
-        # unless disabled, clean up local environment variables
-        if not args.no_cleanup:
-            # delete the pickle file, the config won't be needed anymore
+    elif args.command == "cleanup":
+        # delete the pickle file, the config won't be needed anymore
+        if args.pickle_filepath.exists():
             args.pickle_filepath.unlink()
 
-            # delete all environment variables for good measure
-            for env_var in [
-                "GH_APP_ID",
-                "GH_APP_INSTALL_ID",
-                "GH_PRIVATE_KEY_PEM",
-                "GH_REPO_BASE_URL",
-                "GH_CHECK_REVISION",
-                "GH_CHECK_NAME",
-            ]:
-                os.environ.pop(env_var, default=None)
+        # delete all environment variables for good measure
+        for env_var in [
+            "GH_APP_ID",
+            "GH_APP_INSTALL_ID",
+            "GH_PRIVATE_KEY_PEM",
+            "GH_REPO_BASE_URL",
+            "GH_CHECK_REVISION",
+            "GH_CHECK_NAME",
+        ]:
+            os.environ.pop(env_var, default=None)
