@@ -5,7 +5,7 @@ export GH_APP_ID="1065841" GH_APP_INSTALL_ID="57443831"
 export GH_PRIVATE_KEY_PEM="<>"
 export GH_REPO_BASE_URL="https://github.com/jgubler/github-checks"
 export GH_CHECK_REVISION="$(git rev-parse HEAD)"
-export GH_LOCAL_REPO_PATH="/Users/jgubler/repos/github-checks"
+export GH_LOCAL_REPO_PATH="/Users/jgubler/repos/github-checks-test"
 
 # set up a venv, and install this package in it, including dev dependencies
 # ideally we'll split CI dependencies from dev dependencies at some point
@@ -15,6 +15,8 @@ python3 -m pip install -e .[dev]
 
 # initialize the checks app to auth with GitHub
 python3 -m github_checks.cli init --overwrite-existing
+
+python3 -m github_checks.cli clone-repo && cd $GH_LOCAL_REPO_PATH
 
 # run ruff on ourselves
 python3 -m github_checks.cli start-check-run --check-name ruff-checks
@@ -43,6 +45,11 @@ ruff check . --output-format=sarif > sarif_output.json
 python3 -m github_checks.cli finish-check-run sarif_output.json --log-format sarif
 
 python3 -m github_checks.cli cleanup
+
+# delete the temporarily cloned repo
+cd - && rm -rf $GH_LOCAL_REPO_PATH
+
 # clean up the venv
 deactivate
 rm -rf .temp_venv
+
