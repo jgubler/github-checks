@@ -32,6 +32,15 @@ LOG_OUTPUT_FORMATTERS: dict[
 }
 
 
+def unpickle(pickle_fp: Path, err_msg: str) -> GitHubChecks | None:
+    """Attempt to read the current checks session from the pickle file."""
+    if not pickle_fp.exists():
+        logging.fatal(err_msg)
+        return None
+    with args.pickle_filepath.open("rb") as pickle_file:
+        return pickle.load(pickle_file)  # noqa: S301
+
+
 if __name__ == "__main__":
     argparser = ArgumentParser(
         prog="github-checks",
@@ -88,13 +97,38 @@ if __name__ == "__main__":
         ". If a session is found and this is not set, initialization will abort.",
     )
 
+    clone_parser = subparsers.add_parser(
+        "clone-repo",
+        help="Clone the configured repository to a local folder, using the app's "
+        "same initialized session as is used for the Checks API. Only requires that the"
+        "app installation has repository read permissions, can be useful to avoid "
+        "separate authenticated cloning mechanism (e.g. through deploy keys). Requires "
+        "git to be installed on this system, such that `git clone` can be used.",
+    )
+    clone_parser.add_argument(
+        "--revision",
+        type=str,
+        env_var="GH_CHECK_REVISION",
+        default="master",
+        help="Revision/commit SHA hash that should be checked out. If not specified, "
+        "the repository default revision is checked out, usually master/main HEAD.",
+    )
+    clone_parser.add_argument(
+        "--local-repo-path",
+        type=Path,
+        env_var="GH_LOCAL_REPO_PATH",
+        help="Path to the local folder to clone the repository to. If not used, no "
+        "path is passed to the `git clone` command, thus defaulting to a folder by the "
+        "repos's name within the current working directory.",
+    )
+
     start_parser = subparsers.add_parser(
         "start-check-run",
         help="Start a check run for a specific commit/revision hash, using the "
         "current initialized session. Will show up in GitHub PRs as a running check.",
     )
     start_parser.add_argument(
-        "--revision-sha",
+        "--revision",
         type=str,
         env_var="GH_CHECK_REVISION",
         help="Revision/commit SHA hash that this check run is validating.",
@@ -181,17 +215,36 @@ if __name__ == "__main__":
         with args.pickle_filepath.open("wb") as pickle_file:
             pickle.dump(gh_checks, pickle_file)
 
-    if args.command == "start-check-run":
-        if not args.pickle_filepath.exists():
+    if args.command == "clone-repo":
+        if not (
+            gh_checks := unpickle(
+                args.pickle_filepath,
+                "[github-checks] Trying to clone a repo without initialization "
+                "(pickle file not found). Aborting.",
+            )
+        ):
+            sys.exit(-1)
+        if args.local_repo_path.is_dir() and any(args.local_repo_path.iterdir()):
             logging.fatal(
+                "[github-checks] Local repository path exists and contains "
+                "files. Aborting to avoid overwriting important files.",
+            )
+            sys.exit(-1)
+        gh_checks.clone_repo(args.revision, args.local_repo_path)
+        # don't need to dump the pickle file, as we've only read from the session
+
+    if args.command == "start-check-run":
+        if not (
+            gh_checks := unpickle(
+                args.pickle_filepath,
                 "[github-checks] Trying to start a github check without "
                 "initialization (pickle file not found). Aborting.",
             )
+        ):
             sys.exit(-1)
-        with args.pickle_filepath.open("rb") as pickle_file:
-            gh_checks = pickle.load(pickle_file)  # noqa: S301
+
         gh_checks.start_check_run(
-            revision_sha=args.revision_sha,
+            revision_sha=args.revision,
             check_name=args.check_name,
         )
         with args.pickle_filepath.open("wb") as pickle_file:
@@ -204,11 +257,13 @@ if __name__ == "__main__":
                 "of relative paths. Aborting.",
             )
             sys.exit("-1")
-        if not Path(args.pickle_filepath).exists():
-            logging.fatal(
+        if not (
+            gh_checks := unpickle(
+                args.pickle_filepath,
                 "[github-checks] Error: Trying to update a github check, but no check "
                 "is currently running. Quitting.",
             )
+        ):
             sys.exit(-1)
 
         with args.pickle_filepath.open("rb") as pickle_file:
