@@ -12,10 +12,11 @@ version = "0.0.7"
 requires-python = ">=3.10"
 dependencies = [
     "jwt",
-    "pydantic",
-    "requests",
     "configargparse",
+    "pathspec",
+    "pydantic",
     "pysarif",
+    "requests",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -29,7 +30,6 @@ dev = [
     "check-jsonschema",
     "isort",
     "mypy",
-    "pathspec",
     "pre-commit",
     "pycodestyle",
     "pydocstyle",
