@@ -86,7 +86,7 @@ def test_format_ruff_check_run_output_with_issues_ignored() -> None:
         assert annotation.title
 
 
-def test_format_ruff_check_run_output_no_issues() -> None:
+def test_format_ruff_check_run_output_no_issues() -> int:
     empty_json_fp = Path(tempfile.NamedTemporaryFile(delete=False).name)
     empty_json_fp.write_text("[]")
     output, conclusion = format_ruff_check_run_output(
