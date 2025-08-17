@@ -1,0 +1,11 @@
+bandit
+black
+check-jsonschema
+isort
+mypy
+pre-commit
+pycodestyle
+pydocstyle
+pytest
+ruff
+types-requests

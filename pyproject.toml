@@ -23,21 +23,6 @@ classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "bandit",
-    "black",
-    "check-jsonschema",
-    "isort",
-    "mypy",
-    "pre-commit",
-    "pycodestyle",
-    "pydocstyle",
-    "pytest",
-    "ruff",
-    "types-requests",
-]
-
 [tool.ruff]
 line-length = 88
 output-format = "grouped"

@@ -6,17 +6,25 @@ export GH_PRIVATE_KEY_PEM="/Users/jgubler/.ssh/demo-github-checks-app.pem"
 export GH_REPO_BASE_URL="https://github.com/jgubler/github-checks"
 export GH_CHECK_REVISION="$(git rev-parse HEAD)"
 export GH_LOCAL_REPO_PATH="/Users/jgubler/repos/github-checks-test"
+# this one usually isn't needed, as you'd just install the package from pypi as a req
+export LOCAL_CHECKS_REPO_PATH="/Users/jgubler/repos/github-checks"
 
 # set up a venv, and install this package in it, including dev dependencies
-# ideally we'll split CI dependencies from dev dependencies at some point
+# NOTE: this requires this repository to already be present (=cloned), while another
+# copy of it is cloned to $GH_LOCAL_REPO_PATH below. This looks a little weirdly
+# duplicated, but only because we're both the checks tooling and the checked repo here.
 python3 -m venv .temp_venv
 . .temp_venv/bin/activate
-python3 -m pip install -e .[dev]
+python3 -m pip install -e $LOCAL_CHECKS_REPO_PATH  # here you'd just install from pypi
 
 # initialize the checks app to auth with GitHub
 python3 -m github_checks.cli init --overwrite-existing
 
 python3 -m github_checks.cli clone-repo && cd $GH_LOCAL_REPO_PATH
+# you will have to choose whether you dictate in your check CI to preinstall all qa
+# tools, or if you somehow let the checked repository manage its own qa tooling
+# dependencies, here we've just put them into our tests folder for now
+python3 -m pip install -r tests/requirements_qa.txt
 
 # run ruff on ourselves
 python3 -m github_checks.cli start-check-run --check-name ruff-checks
