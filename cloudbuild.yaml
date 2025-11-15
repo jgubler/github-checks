@@ -1,0 +1,134 @@
+steps:
+  # 0. Dump PEM key to file
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'dump-github-app-pem'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "$$_GH_PRIVATE_KEY_PEM_FILE" > "$_GH_PRIVATE_KEY_PATH"
+    secretEnv: ['_GH_PRIVATE_KEY_PEM_FILE']
+  # 1. Set up Python environment
+  - name: 'python:3.11'
+    id: 'install-deps'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        python3 -m venv /workspace/venv
+        source /workspace/venv/bin/activate
+        python3 -m pip install .
+        python3 -m pip install -r tests/requirements_qa.txt
+
+  # 2. Initialize checks lib
+  - name: 'python:3.11'
+    id: 'init-checks-lib'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source /workspace/venv/bin/activate
+        python3 -m github_checks.cli init
+    env:
+      - 'GH_APP_ID=$_GH_APP_ID'
+      - 'GH_APP_INSTALL_ID=$_GH_APP_INSTALL_ID'
+      - 'GH_REPO_BASE_URL=$_GH_REPO_BASE_URL'
+      - 'GH_PRIVATE_KEY_PEM=$_GH_PRIVATE_KEY_PATH'
+      - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
+
+  # 3. run ruff on ourselves
+  - name: 'python:3.11'
+    id: 'ruff-checks'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source /workspace/venv/bin/activate
+        python3 -m github_checks.cli start-check-run --check-name ruff-checks
+        ruff check . --output-format=json > ruff_output.json
+        python3 -m github_checks.cli finish-check-run ruff_output.json --log-format ruff-json --checksignore-filepath .checksignore
+    env:
+      - 'GH_LOCAL_REPO_PATH=$_GH_LOCAL_REPO_PATH'
+      - 'GH_CHECK_REVISION=$COMMIT_SHA'
+      - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
+
+  # 4. run mypy on ourselves
+  - name: 'python:3.11'
+    id: 'mypy-checks'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source /workspace/venv/bin/activate
+        python3 -m github_checks.cli start-check-run --check-name mypy-checks
+        mypy . --output=json > mypy_output.json
+        echo "/tests/" > .checksignore
+        python3 -m github_checks.cli finish-check-run mypy_output.json --log-format mypy-json --checksignore-filepath .checksignore --checksignore-verdict-only
+    env:
+      - 'GH_LOCAL_REPO_PATH=$_GH_LOCAL_REPO_PATH'
+      - 'GH_CHECK_REVISION=$COMMIT_SHA'
+      - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
+
+  # 5. random raw output to test the raw log format
+  - name: 'python:3.11'
+    id: 'nonsense-raw-checks'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source /workspace/venv/bin/activate
+        python3 -m github_checks.cli start-check-run --check-name test-raw-checks
+        echo "I just don't like this code" > raw_output.json
+        python3 -m github_checks.cli finish-check-run raw_output.json --log-format raw
+    env:
+      - 'GH_LOCAL_REPO_PATH=$_GH_LOCAL_REPO_PATH'
+      - 'GH_CHECK_REVISION=$COMMIT_SHA'
+      - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
+
+  # 6. run the jsonschema checks on an example file for testing
+  - name: 'python:3.11'
+    id: 'jsonschema-checks'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source /workspace/venv/bin/activate
+        python3 -m github_checks.cli start-check-run --check-name test-jsonschema-checks
+        check-jsonschema -o json --schemafile tests/json_validation/user.schema.json tests/json_validation/invalid_user.json > jsonschema_output.json
+        python3 -m github_checks.cli finish-check-run jsonschema_output.json --log-format check-jsonschema
+    env:
+      - 'GH_LOCAL_REPO_PATH=$_GH_LOCAL_REPO_PATH'
+      - 'GH_CHECK_REVISION=$COMMIT_SHA'
+      - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
+
+  # 7.run the sarif checks on ourselves via ruff
+  - name: 'python:3.11'
+    id: 'sarif-ruff-checks'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source /workspace/venv/bin/activate
+        python3 -m github_checks.cli start-check-run --check-name sarif-checks
+        ruff check . --output-format=sarif > sarif_output.json
+        python3 -m github_checks.cli finish-check-run sarif_output.json --log-format sarif
+    env:
+      - 'GH_LOCAL_REPO_PATH=$_GH_LOCAL_REPO_PATH'
+      - 'GH_CHECK_REVISION=$COMMIT_SHA'
+      - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
+
+timeout: '900s'
+substitutions:
+  _GH_APP_ID: "1065841"
+  _GH_APP_INSTALL_ID: "57443831"
+  _GH_REPO_BASE_URL: https://github.com/jgubler/github-checks
+  _GH_PRIVATE_KEY_PATH: /workspace/github_app_private_key.pem
+  _GH_PICKLE_FILEPATH: /workspace/github_checks_session.pkl
+  _GH_LOCAL_REPO_PATH: /workspace/
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/$PROJECT_ID/secrets/demo-github-checks-app-pem/versions/latest
+      env: _GH_PRIVATE_KEY_PEM_FILE
+options:
+  logging: CLOUD_LOGGING_ONLY

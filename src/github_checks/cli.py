@@ -52,6 +52,7 @@ if __name__ == "__main__":
         "--pickle-filepath",
         type=Path,
         default=Path("/tmp/github-checks.pkl"),  # noqa: S108
+        env_var="GH_PICKLE_FILEPATH",
         help="File in which the authenticated checks session will be cached.",
     )
     subparsers = argparser.add_subparsers(
