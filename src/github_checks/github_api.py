@@ -162,8 +162,14 @@ class GitHubChecks:
         cmd = ["git", "clone", clone_url]
         if local_repo_path:
             cmd.append(str(local_repo_path.resolve()))
-        subprocess.check_call(cmd)  # noqa: S603
-        subprocess.check_call(["git", "checkout", revision])  # noqa: S603, S607
+        try:
+            output = subprocess.check_output(
+                ["git", "checkout", revision], stderr=subprocess.STDOUT
+            )
+        except subprocess.CalledProcessError as exc:
+            print(exc.output)
+        else:
+            print(output)
 
     def start_check_run(
         self,
