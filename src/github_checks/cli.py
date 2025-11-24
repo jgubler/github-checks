@@ -100,30 +100,12 @@ if __name__ == "__main__":
         help="If an existing checks session is found (pickle file exists), overwrite it"
         ". If a session is found and this is not set, initialization will abort.",
     )
-
-    clone_parser = subparsers.add_parser(
-        "clone-repo",
-        help="Clone the configured repository to a local folder, using the app's "
-        "same initialized session as is used for the Checks API. Only requires that the"
-        "app installation has repository read permissions, can be useful to avoid "
-        "separate authenticated cloning mechanism (e.g. through deploy keys). Requires "
-        "git to be installed on this system, such that `git clone` can be used.",
-    )
-    clone_parser.add_argument(
-        "--revision",
-        type=str,
-        env_var="GH_CHECK_REVISION",
-        default="master",
-        help="Revision/commit SHA hash that should be checked out. If not specified, "
-        "the repository default revision is checked out, usually master/main HEAD.",
-    )
-    clone_parser.add_argument(
-        "--local-repo-path",
-        type=Path,
-        env_var="GH_LOCAL_REPO_PATH",
-        help="Path to the local folder to clone the repository to. If not used, no "
-        "path is passed to the `git clone` command, thus defaulting to a folder by the "
-        "repos's name within the current working directory.",
+    init_parser.add_argument(
+        "--print-gh-app-install-token",
+        action="store_true",
+        help="If set, the GitHub App installation access token will be printed to "
+        "stdout after initialization, which can e.g. be useful to clone repositories "
+        "this app has access to.",
     )
 
     start_parser = subparsers.add_parser(
@@ -216,24 +198,11 @@ if __name__ == "__main__":
             app_installation_id=args.app_install_id,
             app_privkey_pem=args.pem_path,
         )
+        if args.print_gh_app_install_token:
+            sys.stdout.write(gh_checks.app_install_access_token)
+
         with args.pickle_filepath.open("wb") as pickle_file:
             pickle.dump(gh_checks, pickle_file)
-
-    if args.command == "clone-repo":
-        # will throw FileNotFoundError if there's no pickle file, thus exiting uncaught
-        gh_checks = unpickle(
-            args.pickle_filepath,
-            "[github-checks] Trying to clone a repo without initialization "
-            "(pickle file not found). Aborting.",
-        )
-        if args.local_repo_path.is_dir() and any(args.local_repo_path.iterdir()):
-            LOGGER.critical(
-                "[github-checks] Local repository path exists and contains "
-                "files. Aborting to avoid overwriting important files.",
-            )
-            sys.exit(-1)
-        gh_checks.clone_repo(args.revision, args.local_repo_path)
-        # don't need to dump the pickle file, as we've only read from the session
 
     if args.command == "start-check-run":
         # will throw FileNotFoundError if there's no pickle file, thus exiting uncaught

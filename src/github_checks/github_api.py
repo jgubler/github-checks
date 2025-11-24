@@ -2,7 +2,6 @@
 
 import json
 import logging
-import subprocess
 import sys
 import time
 from collections.abc import Iterable
@@ -99,6 +98,7 @@ class GitHubChecks:
     """Handler to start, update & finish Check runs for a GitHub repo."""
 
     repo_base_url: str
+    app_install_access_token: str
     app_id: str
     app_installation_id: str
     app_privkey_pem: Path
@@ -137,7 +137,7 @@ class GitHubChecks:
         self._github_session = Session()
         self._logger = logger or logging.getLogger(__name__)
 
-        self._app_access_token = _authenticate_as_github_app(
+        self.app_install_access_token = _authenticate_as_github_app(
             app_id,
             app_installation_id,
             app_privkey_pem,
@@ -149,33 +149,10 @@ class GitHubChecks:
             f"{url_parts.scheme}://api.{url_parts.netloc}/repos{url_parts.path}"
         )
         self._api_headers: dict[str, str] = _get_jwt_headers(
-            self._app_access_token,
+            self.app_install_access_token,
             "application/vnd.github+json",
         )
         self.gh_api_timeout = gh_api_timeout
-
-    def clone_repo(
-        self,
-        revision: str,
-        local_repo_path: Path | None,
-    ) -> None:
-        """Clone the configured repository to the local disk."""
-        # base url will be something like https://api.github.com/owner/repo.git
-        # we want to inject git:<token>@ before the domain
-        repo_base_url_noschema = self._plain_base_url.split("https://")[-1]
-        clone_url = f"https://git:{self._app_access_token}@{repo_base_url_noschema}.git"
-        cmd = ["git", "clone", clone_url]
-        if local_repo_path:
-            cmd.append(str(local_repo_path.resolve()))
-        try:
-            output = subprocess.check_output(  # noqa: S603
-                ["git", "checkout", revision],  # noqa: S607
-                stderr=subprocess.STDOUT,
-            )
-        except subprocess.CalledProcessError as exc:
-            self._logger.exception(exc.output)
-        else:
-            self._logger.info(output)
 
     def start_check_run(
         self,

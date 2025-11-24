@@ -55,6 +55,22 @@ python3 -m github_checks.cli finish-check-run ruff_output.json --log-format ruff
 python3 -m github_checks.cli cleanup
 ```
 
+#### Authenticating other GitHub actions using the GitHub Access Token
+Depending on the permissions you've given to your app, you could of course also use its access token to perform other actions.
+This might allow you to avoid managing additional deploy keys (which can only be scoped to individual repos).
+
+For example, while some build environments generally provide you with a local copy of the repository that your build wants to process,
+this may not be available in some cases. You could e.g. use this library to implement an organization-wide check app & build,
+which dynamically determines the to-be-validated repository based on the webhook parameters (more documentation on that to come). In
+such a case, if your app has permissions to read contents of the respective repository you can use the access token as follows to clone:
+
+```bash
+git clone https://git:$TOKEN@github.com/$owner/$repo.git
+```
+
+To obtain the app token for this usage, you can instruct this lib's `init` command to return the bare token to you on stdout by passing the `--print_gh_app_token` flag. How you can pass this value to the git command depends on your build environment, as some may not allow
+executing python and git commands in the same step. In such cases, you'll want to pass the value through either an environment variable
+or file, depending on which option is feasible in your build environment (e.g. in Google CloudBuild, only files persists between steps).
 
 ### As a library
 
