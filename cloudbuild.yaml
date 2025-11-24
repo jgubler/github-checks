@@ -1,13 +1,17 @@
 steps:
   # 0. Dump PEM key to file
-  - name: 'gcr.io/cloud-builders/gcloud'
+  - name: 'gcr.io/cloud-builders/git'
     id: 'dump-github-app-pem'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
         echo "$$_GH_PRIVATE_KEY_PEM_FILE" > "$_GH_PRIVATE_KEY_PATH"
+        git checkout $GH_CHECK_REVISION
     secretEnv: ['_GH_PRIVATE_KEY_PEM_FILE']
+    env:
+      - 'GH_CHECK_REVISION=$COMMIT_SHA'
+
   # 1. Set up Python environment
   - name: 'python:3.11'
     id: 'install-deps'
