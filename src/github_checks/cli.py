@@ -18,6 +18,8 @@ from github_checks.formatters.sarif import format_sarif_check_run_output
 from github_checks.github_api import GitHubChecks
 from github_checks.models import CheckRunConclusion, CheckRunOutput
 
+LOGGER = logging.getLogger(__name__)
+
 LOG_OUTPUT_FORMATTERS: dict[
     str,
     Callable[
@@ -36,7 +38,7 @@ LOG_OUTPUT_FORMATTERS: dict[
 def unpickle(pickle_fp: Path, err_msg: str) -> GitHubChecks:
     """Attempt to read the current checks session from the pickle file."""
     if not pickle_fp.exists():
-        logging.fatal(err_msg)
+        LOGGER.critical(err_msg)
         raise FileNotFoundError(err_msg)
     with pickle_fp.open("rb") as pickle_file:
         return cast("GitHubChecks", pickle.load(pickle_file))  # noqa: S301
@@ -201,7 +203,7 @@ if __name__ == "__main__":
         os.environ["GH_REPO_BASE_URL"] = args.repo_base_url
 
         if args.pickle_filepath.exists() and not args.overwrite_existing:
-            logging.fatal(
+            LOGGER.critical(
                 "[github-checks] Trying to initialize GitHub checks, but an instance "
                 "is already initialized (pickle file exists) and `--overwrite-existing`"
                 " is not set. Aborting.",
@@ -225,7 +227,7 @@ if __name__ == "__main__":
             "(pickle file not found). Aborting.",
         )
         if args.local_repo_path.is_dir() and any(args.local_repo_path.iterdir()):
-            logging.fatal(
+            LOGGER.critical(
                 "[github-checks] Local repository path exists and contains "
                 "files. Aborting to avoid overwriting important files.",
             )
@@ -250,7 +252,7 @@ if __name__ == "__main__":
 
     elif args.command == "finish-check-run":
         if not Path(args.local_repo_path).exists():
-            logging.fatal(
+            LOGGER.critical(
                 "[github-checks] Cannot find local repository copy for resolution "
                 "of relative paths. Aborting.",
             )

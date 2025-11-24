@@ -57,6 +57,7 @@ def _authenticate_as_github_app(  # noqa: PLR0913
     app_installation_id: str,
     app_privkey_pem: Path,
     github_session: Session,
+    logger: logging.Logger,
     github_api_base_url: str = "https://api.github.com",
     timeout: int = 10,
 ) -> str:
@@ -81,7 +82,7 @@ def _authenticate_as_github_app(  # noqa: PLR0913
     try:
         response.raise_for_status()
     except HTTPError:
-        logging.exception(str(response.text))
+        logger.exception(str(response.text))
         sys.exit(-1)
     return str(response.json().get("token"))
 
@@ -109,14 +110,16 @@ class GitHubChecks:
     _curr_annotations_ctr: int
     _plain_base_url: str
     _github_session: Session
+    _logger: logging.Logger
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         repo_base_url: str,
         app_id: str,
         app_installation_id: str,
         app_privkey_pem: Path,
         gh_api_timeout: int = 10,
+        logger: logging.Logger | None = None,
     ) -> None:
         """Initialize the headers for usage with the Checks API.
 
@@ -132,12 +135,14 @@ class GitHubChecks:
         url_parts: ParseResult = urlparse(repo_base_url)
         github_api_base_url: str = f"{url_parts.scheme}://api.{url_parts.netloc}"
         self._github_session = Session()
+        self._logger = logger or logging.getLogger(__name__)
 
         self._app_access_token = _authenticate_as_github_app(
             app_id,
             app_installation_id,
             app_privkey_pem,
             self._github_session,
+            self._logger,
             github_api_base_url,
         )
         self.repo_base_url = (
@@ -162,8 +167,15 @@ class GitHubChecks:
         cmd = ["git", "clone", clone_url]
         if local_repo_path:
             cmd.append(str(local_repo_path.resolve()))
-        subprocess.check_call(cmd)  # noqa: S603
-        subprocess.check_call(["git", "checkout", revision])  # noqa: S603, S607
+        try:
+            output = subprocess.check_output(  # noqa: S603
+                ["git", "checkout", revision],  # noqa: S607
+                stderr=subprocess.STDOUT,
+            )
+        except subprocess.CalledProcessError as exc:
+            self._logger.exception(exc.output)
+        else:
+            self._logger.info(output)
 
     def start_check_run(
         self,
@@ -191,13 +203,13 @@ class GitHubChecks:
         try:
             response.raise_for_status()
         except HTTPError:
-            logging.fatal(
+            self._logger.critical(
                 "GitHub API responded with error code while attempting to start check"
                 " run: %d - %s",
                 response.status_code,
                 response.text,
             )
-            logging.warning(
+            self._logger.warning(
                 "This can occur due to incorrect URLs, please double check "
                 "that %s is the correct API endpoint.",
                 self.repo_base_url + "/check-runs",
@@ -224,7 +236,7 @@ class GitHubChecks:
         :raises HTTPError: in case the GitHub API could not start the check run
         """
         if not self.current_run_id:
-            logging.fatal(
+            self._logger.critical(
                 "[github-checks] Trying to finish check run, but no check is running.",
             )
             return
