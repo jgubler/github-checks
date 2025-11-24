@@ -4,9 +4,8 @@ import logging
 import os
 import pickle
 import sys
-from collections.abc import Callable
 from pathlib import Path
-from typing import cast
+from typing import Protocol, cast
 
 from configargparse import ArgumentParser
 
@@ -20,13 +19,21 @@ from github_checks.models import CheckRunConclusion, CheckRunOutput
 
 LOGGER = logging.getLogger(__name__)
 
-LOG_OUTPUT_FORMATTERS: dict[
-    str,
-    Callable[
-        [Path, Path, list[str] | None, bool],
-        tuple[CheckRunOutput, CheckRunConclusion],
-    ],
-] = {
+
+class LogOutputFormatter(Protocol):
+    """Protocol for log output formatters."""
+
+    def __call__(  # noqa: D102
+        self,
+        json_output_fp: Path,
+        local_repo_base: Path,
+        ignored_globs: list[str] | None,
+        *,
+        ignore_verdict_only: bool = False,
+    ) -> tuple[CheckRunOutput, CheckRunConclusion]: ...
+
+
+LOG_OUTPUT_FORMATTERS: dict[str, LogOutputFormatter] = {
     "check-jsonschema": format_jsonschema_check_run_output,
     "ruff-json": format_ruff_check_run_output,
     "mypy-json": format_mypy_check_run_output,
@@ -247,7 +254,7 @@ if __name__ == "__main__":
             Path(args.validation_log),
             Path(args.local_repo_path),
             ignored_globs,
-            args.checksignore_verdict_only,
+            ignore_verdict_only=args.checksignore_verdict_only,
         )
         if args.conclusion:
             # override if present

@@ -13,7 +13,7 @@ def format_raw_check_run_output(
     _: Path,
     __: list[str] | None = None,
     *,
-    ___: bool = False,
+    ignore_verdict_only: bool = False,  # noqa: ARG001
 ) -> tuple[CheckRunOutput, CheckRunConclusion]:
     """Generate output for raw checks, to be shown on the "Checks" tab."""
     if not output_fp.exists():
