@@ -6,6 +6,7 @@ import pickle
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 from configargparse import ArgumentParser
 
@@ -32,13 +33,13 @@ LOG_OUTPUT_FORMATTERS: dict[
 }
 
 
-def unpickle(pickle_fp: Path, err_msg: str) -> GitHubChecks | None:
+def unpickle(pickle_fp: Path, err_msg: str) -> GitHubChecks:
     """Attempt to read the current checks session from the pickle file."""
     if not pickle_fp.exists():
         logging.fatal(err_msg)
-        return None
-    with args.pickle_filepath.open("rb") as pickle_file:
-        return pickle.load(pickle_file)  # noqa: S301
+        raise FileNotFoundError(err_msg)
+    with pickle_fp.open("rb") as pickle_file:
+        return cast("GitHubChecks", pickle.load(pickle_file))  # noqa: S301
 
 
 if __name__ == "__main__":
@@ -217,14 +218,12 @@ if __name__ == "__main__":
             pickle.dump(gh_checks, pickle_file)
 
     if args.command == "clone-repo":
-        if not (
-            gh_checks := unpickle(
-                args.pickle_filepath,
-                "[github-checks] Trying to clone a repo without initialization "
-                "(pickle file not found). Aborting.",
-            )
-        ):
-            sys.exit(-1)
+        # will throw FileNotFoundError if there's no pickle file, thus exiting uncaught
+        gh_checks = unpickle(
+            args.pickle_filepath,
+            "[github-checks] Trying to clone a repo without initialization "
+            "(pickle file not found). Aborting.",
+        )
         if args.local_repo_path.is_dir() and any(args.local_repo_path.iterdir()):
             logging.fatal(
                 "[github-checks] Local repository path exists and contains "
@@ -235,14 +234,12 @@ if __name__ == "__main__":
         # don't need to dump the pickle file, as we've only read from the session
 
     if args.command == "start-check-run":
-        if not (
-            gh_checks := unpickle(
-                args.pickle_filepath,
-                "[github-checks] Trying to start a github check without "
-                "initialization (pickle file not found). Aborting.",
-            )
-        ):
-            sys.exit(-1)
+        # will throw FileNotFoundError if there's no pickle file, thus exiting uncaught
+        gh_checks = unpickle(
+            args.pickle_filepath,
+            "[github-checks] Trying to start a github check without "
+            "initialization (pickle file not found). Aborting.",
+        )
 
         gh_checks.start_check_run(
             revision_sha=args.revision,
@@ -258,14 +255,12 @@ if __name__ == "__main__":
                 "of relative paths. Aborting.",
             )
             sys.exit("-1")
-        if not (
-            gh_checks := unpickle(
-                args.pickle_filepath,
-                "[github-checks] Error: Trying to update a github check, but no check "
-                "is currently running. Quitting.",
-            )
-        ):
-            sys.exit(-1)
+        # will throw FileNotFoundError if there's no pickle file, thus exiting uncaught
+        gh_checks = unpickle(
+            args.pickle_filepath,
+            "[github-checks] Error: Trying to update a github check, but no check "
+            "is currently running. Quitting.",
+        )
 
         with args.pickle_filepath.open("rb") as pickle_file:
             gh_checks = pickle.load(pickle_file)  # noqa: S301
