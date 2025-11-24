@@ -60,6 +60,7 @@ def format_jsonschema_check_run_output(
     json_output_fp: Path,
     local_repo_base: Path,
     ignore_globs: list[str] | None,
+    *,
     ignore_verdict_only: bool,
 ) -> tuple[CheckRunOutput, CheckRunConclusion]:
     """Generate high level results, to be shown on the "Checks" tab."""
@@ -104,7 +105,7 @@ def format_jsonschema_check_run_output(
                 annotations,
                 ignore_globs,
                 local_repo_base,
-            )
+            ),
         )
         conclusion = get_conclusion(filtered_annotations)
         if not ignore_verdict_only:
