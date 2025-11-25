@@ -7,7 +7,7 @@ steps:
       - '-c'
       - |
         echo "$$_GH_PRIVATE_KEY_PEM_FILE" > "$_GH_PRIVATE_KEY_PATH"
-        git checkout $COMMIT_SHA
+        git checkout "$_GH_COMMIT_SHA"
     secretEnv: ['_GH_PRIVATE_KEY_PEM_FILE']
 
   # 1. Set up Python environment
