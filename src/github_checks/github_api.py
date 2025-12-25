@@ -131,11 +131,18 @@ class GitHubChecks:
         """
         # we do need the repo base url later, but we only need domain itself here
         # for github cloud, this would be https://github.com, for enterprise it's diff
-        self._plain_base_url = repo_base_url
-        url_parts: ParseResult = urlparse(repo_base_url)
-        github_api_base_url: str = f"{url_parts.scheme}://api.{url_parts.netloc}"
         self._github_session = Session()
         self._logger = logger or logging.getLogger(__name__)
+
+        self._plain_base_url = repo_base_url
+        url_parts: ParseResult = urlparse(repo_base_url)
+        if not url_parts.scheme or not url_parts.netloc or not url_parts.path:
+            self._logger.critical(
+                "Invalid GitHub repository base URL provided: %s",
+                repo_base_url,
+            )
+            sys.exit(-1)
+        github_api_base_url: str = f"{url_parts.scheme}://api.{url_parts.netloc}"
 
         self.app_install_access_token = _authenticate_as_github_app(
             app_id,

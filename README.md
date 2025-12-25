@@ -68,7 +68,7 @@ such a case, if your app has permissions to read contents of the respective repo
 git clone https://git:$TOKEN@github.com/$owner/$repo.git
 ```
 
-To obtain the app token for this usage, you can instruct this lib's `init` command to return the bare token to you on stdout by passing the `--print_gh_app_token` flag. How you can pass this value to the git command depends on your build environment, as some may not allow
+To obtain the app token for this usage, you can instruct this lib's `init` command to return the bare token to you on stdout by passing the `--print-gh-app-install-token` flag. How you can pass this value to the git command depends on your build environment, as some may not allow
 executing python and git commands in the same step. In such cases, you'll want to pass the value through either an environment variable
 or file, depending on which option is feasible in your build environment (e.g. in Google CloudBuild, only files persists between steps).
 

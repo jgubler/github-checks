@@ -1,44 +1,101 @@
 steps:
-  # 0. Dump PEM key to file
-  - name: 'gcr.io/cloud-builders/git'
-    id: 'dump-github-app-pem'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        echo "$$_GH_PRIVATE_KEY_PEM_FILE" > "$_GH_PRIVATE_KEY_PATH"
-        git checkout "$_GH_COMMIT_SHA"
-    secretEnv: ['_GH_PRIVATE_KEY_PEM_FILE']
 
-  # 1. Set up Python environment
+# ----------------------------------------
+# Prep Work
+# (0) Prepare the venv and install the public stable version of the lib off of PyPI
+# (1) establish GitHub App auth via the init of the checks lib
+# (2) use this auth'd session to pull the to-be-checked revision
+# (3) reinstall and reinit the checks lib at that revision, thus making the to-be-checked code check itself
+# You would probably want to do (0)-(2) similarly for your own repos, just skipping (3)
+# ----------------------------------------
+
+  # 0. Set up Python environment
   - name: 'python:3.11'
-    id: 'install-deps'
+    id: 'init-venv'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
         python3 -m venv /workspace/venv
         source /workspace/venv/bin/activate
-        python3 -m pip install .
-        python3 -m pip install -r tests/requirements_qa.txt
+        python3 -m pip install .  # todo: repace with install from pypi once deps are ok
 
-  # 2. Initialize checks lib
+  # 1. Initialize checks lib to establish GitHub App auth
   - name: 'python:3.11'
     id: 'init-checks-lib'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
+        echo "$$_GH_PRIVATE_KEY_PEM_FILE" > "$_GH_PRIVATE_KEY_PATH"
         source /workspace/venv/bin/activate
+
+        python3 -m github_checks.cli init --print-gh-app-install-token > GH_APP_TOKEN.txt
+    env:
+      - 'GH_APP_ID=$_GH_APP_ID'
+      - 'GH_APP_INSTALL_ID=$_GH_APP_INSTALL_ID'
+      - 'GH_REPO_BASE_URL=https://$_GH_REPO_BASE'
+      - 'GH_PRIVATE_KEY_PEM=$_GH_PRIVATE_KEY_PATH'
+      - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
+    secretEnv: ['_GH_PRIVATE_KEY_PEM_FILE']
+
+  # 2. check out the to-be-checked revision
+  - name: 'gcr.io/cloud-builders/git'
+    id: 'checkout-commit-to-check'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        TOKEN="$(tr -d '\n' < /workspace/GH_APP_TOKEN.txt)"
+        rm /workspace/GH_APP_TOKEN.txt  # clean up the secret to limit leakage risk
+
+        # since we run on ourselves, we already have a shallow clone of the repo in our CWD
+        # we need to unshallow it to access other commits than the build's head commit
+        # usually, you'd just clone the repo from scratch here
+        git remote set-url origin "https://git:$$TOKEN@${_GH_REPO_BASE}.git"
+        git fetch --unshallow
+
+        git checkout "$_GH_COMMIT_SHA"
+        git config --global safe.directory /workspace
+
+  # 3. Reinstall and reinit the checks lib at the to-be-checked revision
+  # This is to make sure we're running the to-be-checked code to check itself, giving us
+  # a 2-in-1 validation of the code being both clean and working as intended in one build.
+  # This step is unnecessary for other repos, you'd just continue with the PyPi version.
+  - name: 'python:3.11'
+    id: 'reinit-checks-lib'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source /workspace/venv/bin/activate
+        python3 -m github_checks.cli cleanup
+        python3 -m pip uninstall -y github-checks
+
+        python3 -m pip install .
         python3 -m github_checks.cli init
     env:
       - 'GH_APP_ID=$_GH_APP_ID'
       - 'GH_APP_INSTALL_ID=$_GH_APP_INSTALL_ID'
-      - 'GH_REPO_BASE_URL=$_GH_REPO_BASE_URL'
+      - 'GH_REPO_BASE_URL=https://$_GH_REPO_BASE'
       - 'GH_PRIVATE_KEY_PEM=$_GH_PRIVATE_KEY_PATH'
       - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
 
-  # 3. run ruff on ourselves
+# ----------------------------------------
+# Actual work to check the repo's contents starts here
+# ----------------------------------------
+
+  # 0. install any dependencies we'll need for this repo's tests
+  - name: 'python:3.11'
+    id: 'install-deps'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source /workspace/venv/bin/activate
+        python3 -m pip install --no-input -r tests/requirements_qa.txt
+
+  # 1. run ruff on ourselves
   - name: 'python:3.11'
     id: 'ruff-checks'
     entrypoint: 'bash'
@@ -54,7 +111,7 @@ steps:
       - 'GH_CHECK_REVISION=$COMMIT_SHA'
       - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
 
-  # 4. run mypy on ourselves
+  # 2. run mypy on ourselves
   - name: 'python:3.11'
     id: 'mypy-checks'
     entrypoint: 'bash'
@@ -71,7 +128,7 @@ steps:
       - 'GH_CHECK_REVISION=$COMMIT_SHA'
       - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
 
-  # 5. random raw output to test the raw log format
+  # 3. random raw output to test the raw log format
   - name: 'python:3.11'
     id: 'nonsense-raw-checks'
     entrypoint: 'bash'
@@ -87,7 +144,7 @@ steps:
       - 'GH_CHECK_REVISION=$COMMIT_SHA'
       - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
 
-  # 6. run the jsonschema checks on an example file for testing
+  # 4. run the jsonschema checks on an example file for testing
   - name: 'python:3.11'
     id: 'jsonschema-checks'
     entrypoint: 'bash'
@@ -103,7 +160,7 @@ steps:
       - 'GH_CHECK_REVISION=$COMMIT_SHA'
       - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
 
-  # 7.run the sarif checks on ourselves via ruff
+  # 5. run the sarif checks on ourselves via ruff
   - name: 'python:3.11'
     id: 'sarif-ruff-checks'
     entrypoint: 'bash'
@@ -123,7 +180,7 @@ timeout: '900s'
 substitutions:
   _GH_APP_ID: "1065841"
   _GH_APP_INSTALL_ID: "57443831"
-  _GH_REPO_BASE_URL: https://github.com/jgubler/github-checks
+  _GH_REPO_BASE: "github.com/jgubler/github-checks"
   _GH_PRIVATE_KEY_PATH: /workspace/github_app_private_key.pem
   _GH_PICKLE_FILEPATH: /workspace/github_checks_session.pkl
   _GH_LOCAL_REPO_PATH: /workspace/

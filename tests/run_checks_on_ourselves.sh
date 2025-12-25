@@ -4,7 +4,6 @@
 export GH_APP_ID="1065841" GH_APP_INSTALL_ID="57443831"
 export GH_PRIVATE_KEY_PEM="/Users/jgubler/.ssh/demo-github-checks-app.pem"
 export GH_REPO_BASE_URL="https://github.com/jgubler/github-checks"
-export GH_CHECK_REVISION="$(git rev-parse HEAD)"
 export GH_LOCAL_REPO_PATH="/Users/jgubler/repos/github-checks-test"
 # this one usually isn't needed, as you'd just install the package from pypi as a req
 export LOCAL_CHECKS_REPO_PATH="/Users/jgubler/repos/github-checks"
@@ -15,7 +14,10 @@ export LOCAL_CHECKS_REPO_PATH="/Users/jgubler/repos/github-checks"
 # duplicated, but only because we're both the checks tooling and the checked repo here.
 python3 -m venv .temp_venv
 . .temp_venv/bin/activate
-python3 -m pip install -e $LOCAL_CHECKS_REPO_PATH  # here you'd just install from pypi
+cd $LOCAL_CHECKS_REPO_PATH || exit 1
+python3 -m pip install -e .  # here you'd just install from pypi
+export GH_CHECK_REVISION="$(git rev-parse HEAD)"
+cd -
 
 # initialize the checks app to auth with GitHub
 python3 -m github_checks.cli init --overwrite-existing
