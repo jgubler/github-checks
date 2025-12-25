@@ -9,19 +9,19 @@ from github_checks.models import (
 
 
 def format_raw_check_run_output(
-    output_fp: Path,
-    _: Path,
-    __: list[str] | None = None,
+    json_output_fp: Path,
+    local_repo_base: Path,  # noqa: ARG001
+    ignored_globs: list[str] | None = None,  # noqa: ARG001
     *,
     ignore_verdict_only: bool = False,  # noqa: ARG001
 ) -> tuple[CheckRunOutput, CheckRunConclusion]:
     """Generate output for raw checks, to be shown on the "Checks" tab."""
-    if not output_fp.exists():
+    if not json_output_fp.exists():
         # If the output file does not exist, we consider it a success
         conclusion = CheckRunConclusion.SUCCESS
         raw_output = ""
     else:
-        with output_fp.open("r", encoding="utf-8") as f:
+        with json_output_fp.open("r", encoding="utf-8") as f:
             raw_output = f.read().strip()
             # If there is no output, we consider it a success
             # If there is output, we consider it an action required

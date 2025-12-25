@@ -59,9 +59,9 @@ def get_err_loc(filename: Path, path: str) -> tuple[int, int, int]:
 def format_jsonschema_check_run_output(
     json_output_fp: Path,
     local_repo_base: Path,
-    ignore_globs: list[str] | None,
+    ignored_globs: list[str] | None = None,
     *,
-    ignore_verdict_only: bool,
+    ignore_verdict_only: bool = False,
 ) -> tuple[CheckRunOutput, CheckRunConclusion]:
     """Generate high level results, to be shown on the "Checks" tab."""
     with json_output_fp.open("r", encoding="utf-8") as json_file:
@@ -99,11 +99,11 @@ def format_jsonschema_check_run_output(
         )
 
     # Filter out ignored files from the verdict / annotations (depending on settings)
-    if ignore_globs:
+    if ignored_globs:
         filtered_annotations: list[CheckAnnotation] = list(
             filter_for_checksignore(
                 annotations,
-                ignore_globs,
+                ignored_globs,
                 local_repo_base,
             ),
         )

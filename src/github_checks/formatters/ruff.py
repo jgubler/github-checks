@@ -92,7 +92,7 @@ def _format_annotations_for_ruff_json_output(
 def format_ruff_check_run_output(
     json_output_fp: Path,
     local_repo_base: Path,
-    ignore_globs: list[str] | None = None,
+    ignored_globs: list[str] | None = None,
     *,
     ignore_verdict_only: bool = False,
 ) -> tuple[CheckRunOutput, CheckRunConclusion]:
@@ -123,11 +123,11 @@ def format_ruff_check_run_output(
     )
 
     # Filter out ignored files from the verdict / annotations (depending on settings)
-    if ignore_globs:
+    if ignored_globs:
         filtered_annotations: list[CheckAnnotation] = list(
             filter_for_checksignore(
                 annotations,
-                ignore_globs,
+                ignored_globs,
                 local_repo_base,
             ),
         )
