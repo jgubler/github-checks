@@ -108,7 +108,7 @@ steps:
         python3 -m github_checks.cli finish-check-run ruff_output.json --log-format ruff-json --checksignore-filepath .checksignore
     env:
       - 'GH_LOCAL_REPO_PATH=$_GH_LOCAL_REPO_PATH'
-      - 'GH_CHECK_REVISION=$COMMIT_SHA'
+      - 'GH_CHECK_REVISION=$_GH_COMMIT_SHA'
       - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
 
   # 2. run mypy on ourselves
@@ -125,7 +125,7 @@ steps:
         python3 -m github_checks.cli finish-check-run mypy_output.json --log-format mypy-json --checksignore-filepath .checksignore --checksignore-verdict-only
     env:
       - 'GH_LOCAL_REPO_PATH=$_GH_LOCAL_REPO_PATH'
-      - 'GH_CHECK_REVISION=$COMMIT_SHA'
+      - 'GH_CHECK_REVISION=$_GH_COMMIT_SHA'
       - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
 
   # 3. random raw output to test the raw log format
@@ -141,7 +141,7 @@ steps:
         python3 -m github_checks.cli finish-check-run raw_output.json --log-format raw
     env:
       - 'GH_LOCAL_REPO_PATH=$_GH_LOCAL_REPO_PATH'
-      - 'GH_CHECK_REVISION=$COMMIT_SHA'
+      - 'GH_CHECK_REVISION=$_GH_COMMIT_SHA'
       - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
 
   # 4. run the jsonschema checks on an example file for testing
@@ -157,7 +157,7 @@ steps:
         python3 -m github_checks.cli finish-check-run jsonschema_output.json --log-format check-jsonschema
     env:
       - 'GH_LOCAL_REPO_PATH=$_GH_LOCAL_REPO_PATH'
-      - 'GH_CHECK_REVISION=$COMMIT_SHA'
+      - 'GH_CHECK_REVISION=$_GH_COMMIT_SHA'
       - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
 
   # 5. run the sarif checks on ourselves via ruff
@@ -173,7 +173,7 @@ steps:
         python3 -m github_checks.cli finish-check-run sarif_output.json --log-format sarif
     env:
       - 'GH_LOCAL_REPO_PATH=$_GH_LOCAL_REPO_PATH'
-      - 'GH_CHECK_REVISION=$COMMIT_SHA'
+      - 'GH_CHECK_REVISION=$_GH_COMMIT_SHA'
       - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
 
 timeout: '900s'
