@@ -1,36 +1,36 @@
 """Model representation of GitHub checks specific dictionary/json structures."""
 
-from enum import Enum
+from enum import StrEnum, auto
 from typing import Any
 
 from pydantic import BaseModel
 
 
-class CheckRunConclusion(Enum):
+class CheckRunConclusion(StrEnum):
     """The valid conclusion states of a check run.
 
     See https://docs.github.com/en/rest/checks/runs#update-a-check-run for details.
     """
 
-    ACTION_REQUIRED = "action_required"
-    SUCCESS = "success"
-    FAILURE = "failure"
-    NEUTRAL = "neutral"
-    SKIPPED = "skipped"
-    STALE = "stale"
-    TIMED_OUT = "timed_out"
-    CANCELLED = "cancelled"
+    ACTION_REQUIRED = auto()
+    SUCCESS = auto()
+    FAILURE = auto()
+    NEUTRAL = auto()
+    SKIPPED = auto()
+    STALE = auto()
+    TIMED_OUT = auto()
+    CANCELLED = auto()
 
 
-class AnnotationLevel(Enum):
+class AnnotationLevel(StrEnum):
     """The severity levels permitted by GitHub checks for each individual annotation.
 
     See https://docs.github.com/en/rest/checks/runs#update-a-check-run for details.
     """
 
-    NOTICE = "notice"
-    WARNING = "warning"
-    FAILURE = "failure"
+    NOTICE = auto()
+    WARNING = auto()
+    FAILURE = auto()
 
 
 class CheckRunAction(BaseModel):
