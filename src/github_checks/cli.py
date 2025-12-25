@@ -27,7 +27,7 @@ class LogOutputFormatter(Protocol):
         self,
         json_output_fp: Path,
         local_repo_base: Path,
-        ignored_globs: list[str] | None,
+        ignored_globs: list[str] | None = None,
         *,
         ignore_verdict_only: bool = False,
     ) -> tuple[CheckRunOutput, CheckRunConclusion]: ...
