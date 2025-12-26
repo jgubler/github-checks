@@ -135,9 +135,16 @@ def format_pyright_check_run_output(
 ) -> tuple[CheckRunOutput, CheckRunConclusion]:
     """Generate high level results, to be shown on the "Checks" tab."""
     with json_output_fp.open("r", encoding="utf-8") as json_file:
-        print(json_file.read())
-        json_file.seek(0)
-        json_file.readline()  # Skip the first line
+        first_line = json_file.readline()
+        # for some reason, pyright stdout sometimes starts with a line like this:
+        # {'x86': False, 'risc': False, 'lts': False}  # noqa: ERA001
+        # I suspect it's a side effect of running node, but don't know for sure.
+        if first_line.startswith("{'x86'"):
+            # it's here, skip it, as it's neither relevant to the report nor valid JSON
+            pass
+        else:
+            # weird line is not present, rewind to start
+            json_file.seek(0)
         json_content = json.load(json_file)
     report = PyrightReport.model_validate(json_content)
 
@@ -145,7 +152,7 @@ def format_pyright_check_run_output(
     rule_counts: defaultdict[str, int] = defaultdict(int)  # auto-initialized to 0
 
     for diag in report.generalDiagnostics:
-        annotations.append(get_annotation(diag))
+        annotations.append(get_annotation(diag, local_repo_base))
         if diag.rule:
             rule_counts[diag.rule] += 1
 
@@ -164,11 +171,38 @@ def format_pyright_check_run_output(
     else:
         conclusion = get_conclusion(annotations)
 
-    title = None
+    title, summary = get_summary_and_title(conclusion, report.summary, rule_counts)
+
+    return (
+        CheckRunOutput(
+            title=title,
+            summary=summary,
+            annotations=annotations,
+        ),
+        conclusion,
+    )
+
+
+def get_summary_and_title(
+    conclusion: CheckRunConclusion,
+    report_summary: PyrightSummary,
+    rule_counts: dict[str, int],
+) -> tuple[str, str]:
+    """Generate a summary and title for the Pyright check run.
+
+    Args:
+        conclusion (CheckRunConclusion): The overall conclusion of the check run.
+        report_summary (PyrightSummary): The summary of the Pyright analysis results.
+        rule_counts (dict[str, int]): A dict mapping rules to their occurrence counts.
+
+    Returns:
+        tuple[str, str]: A tuple containing the title and summary for the check run.
+    """
+    title: str
     num_issues: int = (
-        report.summary.errorCount
-        + report.summary.warningCount
-        + report.summary.informationCount
+        report_summary.errorCount
+        + report_summary.warningCount
+        + report_summary.informationCount
     )
     if conclusion == CheckRunConclusion.ACTION_REQUIRED:
         title = f"Pyright found {num_issues} total issue(s), some require resolution."
@@ -181,28 +215,22 @@ def format_pyright_check_run_output(
         summary = "Nice work!"
     else:
         rules_summary = "\n".join(
-            f"\t{rule} ({count})" for rule, count in rule_counts.items()
+            f"- `{rule}` ({count})" for rule, count in rule_counts.items()
         )
+        errnum = report_summary.errorCount
+        warnnum = report_summary.warningCount
+        info_num = report_summary.informationCount
         summary = "\n".join(
             (
-                f"- Errors: {report.summary.errorCount}",
-                f"- Warnings: {report.summary.warningCount}",
-                f"- Information: {report.summary.informationCount}",
-                "- Rules triggered:",
+                f"{errnum} Errors, {warnnum} Warnings, {info_num} Informational",
+                "Rules triggered:",
                 rules_summary,
             ),
         )
-    return (
-        CheckRunOutput(
-            title=title,
-            summary=summary,
-            annotations=annotations,
-        ),
-        conclusion,
-    )
+    return title, summary
 
 
-def get_annotation(diag: PyrightDiagnostic) -> CheckAnnotation:
+def get_annotation(diag: PyrightDiagnostic, local_repo_base: Path) -> CheckAnnotation:
     """Convert a Pyright diagnostic object into a GitHub Check Annotation.
 
     This function processes the diagnostic information provided by Pyright,
@@ -228,7 +256,7 @@ def get_annotation(diag: PyrightDiagnostic) -> CheckAnnotation:
     annotation_level = PyrightSeverity.to_annotation_level(diag.severity)
 
     return CheckAnnotation(
-        path=diag.file,
+        path=str(Path(diag.file).relative_to(local_repo_base)),
         start_line=start_line,
         end_line=end_line,
         start_column=start_column,
