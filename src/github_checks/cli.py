@@ -159,7 +159,7 @@ if __name__ == "__main__":
     )
     finish_parser.add_argument(
         "--conclusion",
-        choices=CheckRunConclusion,
+        choices=[c.value for c in CheckRunConclusion],
         required=False,
         help="Optional override for the conclusion this check run should finish with."
         "If not provided, success/action_required are used, depending on annotations.",
