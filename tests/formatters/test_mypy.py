@@ -42,7 +42,7 @@ def test_format_mypy_check_run_output_with_issues() -> None:
     output, conclusion = format_mypy_check_run_output(
         sample_output_fp,
         Path(__file__).parent.parent.parent,
-        ignore_globs=None,
+        ignored_globs=None,
         ignore_verdict_only=False,
     )
     assert isinstance(output, CheckRunOutput)
@@ -64,7 +64,7 @@ def test_format_mypy_check_run_output_no_issues() -> None:
     output, conclusion = format_mypy_check_run_output(
         empty_json_fp,
         Path(__file__).parent,
-        ignore_globs=None,
+        ignored_globs=None,
         ignore_verdict_only=False,
     )
     assert isinstance(output, CheckRunOutput)

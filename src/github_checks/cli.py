@@ -27,8 +27,8 @@ class LogOutputFormatter(Protocol):
         self,
         json_output_fp: Path,
         local_repo_base: Path,
-        ignored_globs: list[str] | None = None,
         *,
+        ignored_globs: list[str] | None = None,
         ignore_verdict_only: bool = False,
     ) -> tuple[CheckRunOutput, CheckRunConclusion]: ...
 
@@ -253,7 +253,7 @@ if __name__ == "__main__":
         check_run_output, check_run_conclusion = LOG_OUTPUT_FORMATTERS[args.log_format](
             Path(args.validation_log),
             Path(args.local_repo_path),
-            ignored_globs,
+            ignored_globs=ignored_globs,
             ignore_verdict_only=args.checksignore_verdict_only,
         )
         if args.conclusion:
