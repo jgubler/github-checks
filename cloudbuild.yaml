@@ -127,7 +127,23 @@ steps:
       - 'GH_CHECK_REVISION=$_GH_COMMIT_SHA'
       - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
 
-  # 3. random raw output to test the raw log format
+  # 3. run pyright on ourselves
+  - name: 'python:3.11'
+    id: 'pyright-checks'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source /workspace/venv/bin/activate
+        python3 -m github_checks.cli start-check-run --check-name pyright-checks
+        pyright . --outputjson > pyright_output.json
+        python3 -m github_checks.cli finish-check-run pyright_output.json --log-format pyright-json --checksignore-filepath .checksignore --checksignore-verdict-only
+    env:
+      - 'GH_LOCAL_REPO_PATH=$_GH_LOCAL_REPO_PATH'
+      - 'GH_CHECK_REVISION=$_GH_COMMIT_SHA'
+      - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
+
+  # 4. random raw output to test the raw log format
   - name: 'python:3.11'
     id: 'nonsense-raw-checks'
     entrypoint: 'bash'
@@ -143,7 +159,7 @@ steps:
       - 'GH_CHECK_REVISION=$_GH_COMMIT_SHA'
       - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
 
-  # 4. run the jsonschema checks on an example file for testing
+  # 5. run the jsonschema checks on an example file for testing
   - name: 'python:3.11'
     id: 'jsonschema-checks'
     entrypoint: 'bash'
@@ -159,7 +175,7 @@ steps:
       - 'GH_CHECK_REVISION=$_GH_COMMIT_SHA'
       - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
 
-  # 5. run the sarif checks on ourselves via ruff
+  # 6. run the sarif checks on ourselves via ruff
   - name: 'python:3.11'
     id: 'sarif-ruff-checks'
     entrypoint: 'bash'
