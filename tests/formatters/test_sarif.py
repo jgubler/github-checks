@@ -108,7 +108,7 @@ def test_format_sarif_check_run_output_with_issues() -> None:
     output, conclusion = format_sarif_check_run_output(
         sample_output_fp,
         REPO_ROOT,
-        ignore_globs=None,
+        ignored_globs=None,
         ignore_verdict_only=True,
     )
     assert isinstance(output, CheckRunOutput)

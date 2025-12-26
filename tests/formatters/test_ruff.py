@@ -92,7 +92,7 @@ def test_format_ruff_check_run_output_no_issues() -> None:
     output, conclusion = format_ruff_check_run_output(
         empty_json_fp,
         REPO_ROOT,
-        ignore_globs=None,
+        ignored_globs=None,
         ignore_verdict_only=False,
     )
     assert isinstance(output, CheckRunOutput)
