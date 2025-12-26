@@ -24,9 +24,10 @@ def test_format_raw_check_run_output_with_issues() -> None:
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.ACTION_REQUIRED
+    assert output.title
     assert "Raw Check Results" in output.title
     assert "This went very badly" in output.summary
-    assert len(output.annotations) == 0  # Raw formatter does not produce annotations
+    assert output.annotations == []  # Raw formatter does not produce annotations
 
 
 def test_format_raw_check_run_output_no_issues() -> None:
@@ -38,9 +39,10 @@ def test_format_raw_check_run_output_no_issues() -> None:
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.SUCCESS
+    assert output.title
     assert "Raw Check Results" in output.title
     assert output.summary == ""
-    assert len(output.annotations) == 0  # Raw formatter does not produce annotations
+    assert output.annotations == []  # Raw formatter does not produce annotations
 
 
 def test_format_raw_check_run_no_output_file() -> None:
@@ -52,6 +54,7 @@ def test_format_raw_check_run_no_output_file() -> None:
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.SUCCESS
+    assert output.title
     assert "Raw Check Results" in output.title
     assert output.summary == ""
-    assert len(output.annotations) == 0  # Raw formatter does not produce annotations
+    assert output.annotations == []  # Raw formatter does not produce annotations

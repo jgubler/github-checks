@@ -55,6 +55,7 @@ def test_format_check_jsonschema_check_run_output_with_issues() -> None:
         output.summary
         == "The schema validation found the following issues in JSON/YAML files:"
     )
+    assert output.annotations is not None
     assert len(output.annotations) == 3  # noqa: PLR2004
     for annotation in output.annotations:
         assert annotation.annotation_level == AnnotationLevel.WARNING

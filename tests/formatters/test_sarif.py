@@ -113,8 +113,10 @@ def test_format_sarif_check_run_output_with_issues() -> None:
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.ACTION_REQUIRED
+    assert output.title is not None
     assert "ruff found" in output.title
     assert "LOG015" in output.summary
+    assert output.annotations is not None
     assert len(output.annotations) == 2  # noqa: PLR2004
     for annotation in output.annotations:
         assert annotation.annotation_level == AnnotationLevel.WARNING
@@ -133,6 +135,7 @@ def test_format_ruff_check_run_output_no_issues() -> None:
         output, conclusion = format_sarif_check_run_output(tempfile_fp, REPO_ROOT)
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.SUCCESS
+    assert output.title is not None
     assert "no issues" in output.title.lower()
     assert output.summary == "Nice work!"
     assert output.annotations == []
