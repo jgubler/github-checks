@@ -11,6 +11,7 @@ from configargparse import ArgumentParser
 
 from github_checks.formatters.check_jsonschema import format_jsonschema_check_run_output
 from github_checks.formatters.mypy import format_mypy_check_run_output
+from github_checks.formatters.pyright import format_pyright_check_run_output
 from github_checks.formatters.raw import format_raw_check_run_output
 from github_checks.formatters.ruff import format_ruff_check_run_output
 from github_checks.formatters.sarif import format_sarif_check_run_output
@@ -37,6 +38,7 @@ LOG_OUTPUT_FORMATTERS: dict[str, LogOutputFormatter] = {
     "check-jsonschema": format_jsonschema_check_run_output,
     "ruff-json": format_ruff_check_run_output,
     "mypy-json": format_mypy_check_run_output,
+    "pyright-json": format_pyright_check_run_output,
     "sarif": format_sarif_check_run_output,
     "raw": format_raw_check_run_output,
 }
