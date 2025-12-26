@@ -45,14 +45,16 @@ def test_format_ruff_check_run_output_with_issues() -> None:
     output, conclusion = format_ruff_check_run_output(
         sample_output_fp,
         REPO_ROOT,
-        ignore_globs=None,
+        ignored_globs=None,
         ignore_verdict_only=False,
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.ACTION_REQUIRED
+    assert output.title is not None
     assert "Ruff found" in output.title
     assert "D100" in output.summary
     assert "LOG015" in output.summary
+    assert output.annotations is not None
     assert len(output.annotations) == 2  # noqa: PLR2004
     for annotation in output.annotations:
         assert annotation.annotation_level == AnnotationLevel.WARNING
@@ -70,14 +72,16 @@ def test_format_ruff_check_run_output_with_issues_ignored() -> None:
     output, conclusion = format_ruff_check_run_output(
         sample_output_fp,
         REPO_ROOT,
-        ignore_globs=["/src/github_checks/"],
+        ignored_globs=["/src/github_checks/"],
         ignore_verdict_only=True,
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.SUCCESS
+    assert output.title is not None
     assert "Ruff only found" in output.title
     assert "D100" in output.summary
     assert "LOG015" in output.summary
+    assert output.annotations is not None
     assert len(output.annotations) == 2  # noqa: PLR2004
     for annotation in output.annotations:
         assert annotation.annotation_level == AnnotationLevel.WARNING
@@ -97,6 +101,7 @@ def test_format_ruff_check_run_output_no_issues() -> None:
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.SUCCESS
+    assert output.title is not None
     assert "no issues" in output.title.lower()
     assert output.summary == "Nice work!"
     assert output.annotations == []

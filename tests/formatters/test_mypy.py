@@ -47,9 +47,11 @@ def test_format_mypy_check_run_output_with_issues() -> None:
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.ACTION_REQUIRED
+    assert output.title is not None
     assert "Mypy found" in output.title
     assert "return-value" in output.summary
     assert "dict-item" in output.summary
+    assert output.annotations is not None
     assert len(output.annotations) == 2  # noqa: PLR2004
     for annotation in output.annotations:
         assert annotation.annotation_level == AnnotationLevel.WARNING
@@ -69,6 +71,7 @@ def test_format_mypy_check_run_output_no_issues() -> None:
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.SUCCESS
+    assert output.title is not None
     assert "Mypy found no issues" in output.title
     assert output.summary == "Nice work!"
-    assert len(output.annotations) == 0
+    assert output.annotations == []
