@@ -21,24 +21,6 @@ from github_checks.models import (
     CheckRunOutput,
 )
 
-"""
-Pyright JSON formatter.
-
-Parses the JSON produced by `pyright --outputjson` into a list of
-annotation dictionaries suitable for consumption by the rest of the
-github-checks tooling/tests.
-
-Each returned annotation dict has the following keys:
-- path: str
-- start_line: int (1-based)
-- end_line: int (1-based)
-- start_column: int (1-based)
-- end_column: int (1-based)
-- annotation_level: str ('failure' | 'warning' | 'notice')
-- message: str
-- rule: Optional[str]
-"""
-
 
 class DiagnosticPosition(BaseModel):
     """Represents a position in the source code with line and character numbers.
@@ -153,6 +135,9 @@ def format_pyright_check_run_output(
 ) -> tuple[CheckRunOutput, CheckRunConclusion]:
     """Generate high level results, to be shown on the "Checks" tab."""
     with json_output_fp.open("r", encoding="utf-8") as json_file:
+        print(json_file.read())
+        json_file.seek(0)
+        json_file.readline()  # Skip the first line
         json_content = json.load(json_file)
     report = PyrightReport.model_validate(json_content)
 
