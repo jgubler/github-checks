@@ -183,7 +183,7 @@ steps:
       - '-c'
       - |
         source /workspace/venv/bin/activate
-        python3 -m github_checks.cli start-check-run --check-name sarif-checks
+        python3 -m github_checks.cli start-check-run --check-name sarif-ruff-checks
         ruff check . --output-format=sarif > sarif_output.json
         python3 -m github_checks.cli finish-check-run sarif_output.json --log-format sarif --checksignore-filepath .checksignore --checksignore-verdict-only
     env:
