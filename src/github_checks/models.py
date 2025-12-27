@@ -71,7 +71,7 @@ class CheckAnnotation(BaseModel):
     title: str | None = None
     raw_details: str | None = None
 
-    def model_dump(  # noqa: D102
+    def model_dump(  # noqa: D102 # pyright: ignore[reportIncompatibleMethodOverride]
         self,
     ) -> Any:  # noqa: ANN401
         return super().model_dump(exclude_none=True, exclude_unset=True)

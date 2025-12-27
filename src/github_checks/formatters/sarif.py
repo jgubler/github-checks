@@ -4,7 +4,7 @@ import json
 from collections.abc import Iterable
 from pathlib import Path
 
-from pysarif import load_from_dict
+from pysarif import Region, ReportingDescriptor, Result, load_from_dict
 
 from github_checks.formatters.utils import filter_for_checksignore, get_conclusion
 from github_checks.models import (
@@ -13,6 +13,21 @@ from github_checks.models import (
     CheckRunConclusion,
     CheckRunOutput,
 )
+
+
+def get_rule_name(full_rule: ReportingDescriptor) -> str:
+    """Extract the rule name from a SARIF ReportingDescriptor.
+
+    :param full_rule: SARIF ReportingDescriptor for the rule
+    :return: rule name as a string
+    """
+    if full_rule.name:
+        # name should be in full_rule.name, sadly pysarif often fails to parse it
+        return str(full_rule.name)
+    if full_rule.help_uri:
+        # if we have a URI for the rule, the final part is usually the rule name
+        return str(full_rule.help_uri.split("/")[-1])
+    return "Unknown Rule"
 
 
 def _format_annotations_for_sarif_json_output(
@@ -35,32 +50,35 @@ def _format_annotations_for_sarif_json_output(
 
     # We only support processing one run in the SARIF output for now
     run = sarif_output.runs[0]
-    tool_rules = run.tool.driver.rules
+    tool_rules: list[ReportingDescriptor] = run.tool.driver.rules or []
 
-    for result in run.results:
-        full_rule = next(rule for rule in tool_rules if rule.id == result.rule_id)
+    for result in run.results or []:
+        if not (
+            full_rule := next(
+                (rule for rule in tool_rules if rule.id == result.rule_id),
+                None,
+            )
+        ):
+            # This result's rule is not in the tool's rules list, should never occur
+            continue
 
-        # Note: github annotations have markdown support -> let's hyperlink the err code
-        # this will look like "D100: undocumented public module" with the D100 clickable
-        # the name should be in full_rule.properties.name, but pysarif fails to parse it
-        rule_name = full_rule.help_uri.split("/")[-1]
-        title: str = f"[{result.rule_id}] {rule_name}"
-        raw_details = "About the rule:\n\n" + full_rule.full_description.text
-        message = (
-            result.message.text
-            + "\n\nSee "
-            + full_rule.help_uri
-            + " for more information."
+        title, message, raw_details = get_annotation_texts_from_sarif_result(
+            result,
+            full_rule,
         )
 
-        for location in result.locations:
+        for location in result.locations or []:
+            region: Region | None
             try:
                 filepath = Path(
-                    location.physical_location.artifact_location.uri.partition(":")[2],
+                    location.physical_location.artifact_location.uri.partition(":")[2],  # pyright: ignore[reportOptionalMemberAccess]
                 )
-                region = location.physical_location.region
+                region = location.physical_location.region  # pyright: ignore[reportOptionalMemberAccess]
             except AttributeError:
-                # error without any location, skip it
+                # error without any sensible location, skip it
+                continue
+            if not (region and region.start_line and region.end_line):
+                # error without any sensible location, skip it
                 continue
             err_is_on_one_line: bool = region.start_line == region.end_line
 
@@ -75,6 +93,76 @@ def _format_annotations_for_sarif_json_output(
                 raw_details=raw_details,
                 title=title,
             )
+
+
+def get_annotation_texts_from_sarif_result(  # noqa: C901, PLR0912
+    result: Result,
+    full_rule: ReportingDescriptor,
+) -> tuple[str, str, str | None]:
+    """Extract title, message, and raw_details for a SARIF result annotation.
+
+    :param result: SARIF result object
+    :param full_rule: SARIF ReportingDescriptor for the rule that triggered this result
+    :return: tuple of (title, message, raw_details)
+    """
+    rule_name: str
+    if full_rule.name:
+        # name should be in full_rule.name, sadly pysarif often fails to parse it
+        rule_name = full_rule.name
+    elif full_rule.help_uri:
+        # if we have a URI for the rule, the final part is usually the rule name
+        rule_name = full_rule.help_uri.split("/")[-1]
+    else:
+        rule_name = "Unknown Rule"
+
+    # Note: github annotations do not have markdown support, only check run summaries do
+    title: str = f"[{result.rule_id}]: {rule_name}" if result.rule_id else rule_name
+
+    raw_details: str | None = None
+
+    if full_rule.full_description and full_rule.full_description.text:
+        raw_details = (
+            "Background for this rule per tool's documentation:\n> "
+            + "\n> ".join(full_rule.full_description.text.split("\n"))
+        )
+    elif full_rule.full_description and full_rule.full_description.markdown:
+        # we'll only use markdown if plain text is not available, as with the raw detail
+        # display of comments not supporting markdown, it's less readable than plain
+        raw_details = (
+            "Background for this rule per tool's documentation:\n> "
+            + "\n> ".join(full_rule.full_description.markdown.split("\n"))
+        )
+    message: str | None = None
+    if result.message.markdown:
+        message = result.message.markdown
+    elif result.message.text:
+        message = result.message.text
+
+    message_add = ""
+    if raw_details:
+        message_add += "the raw details of this comment"
+    if result.rule_id:
+        if message_add:
+            message_add += " or "
+        rule_uri = f"({full_rule.help_uri}) " if full_rule.help_uri else ""
+        message_add += (
+            f"documentation for rule {result.rule_id} {rule_uri}for more information."
+        )
+    if message_add:
+        message = f"{message}\n\n" if message else ""
+        message += f"See {message_add}"
+    if not message:
+        message = "No additional information provided."
+
+    raw_details = None
+
+    if full_rule.full_description and full_rule.full_description.text:
+        raw_details = (
+            "Background for this rule per tool's documentation:\n> "
+            + "\n> ".join(full_rule.full_description.text.split("\n"))
+        )
+
+    return title, message, raw_details
 
 
 def format_sarif_check_run_output(
@@ -115,13 +203,26 @@ def format_sarif_check_run_output(
     # [LOG015](https://docs.astral.sh/ruff/rules/root-logger-call') root-logger-call
     # the name _should_ be in full_rule.properties.name, but pysarif fails to parse it,
     # so we use the last part of the help_uri instead, which is identical thankfully
-    issues = [
-        f"## [[{rule.id}]({rule.help_uri})] {rule.help_uri.split('/')[-1]}\n"
-        f"Background for this rule per {tool_name}'s documentation:\n> "
-        + "\n> ".join(rule.full_description.text.split("\n"))
-        + "\n"
-        for rule in sarif_output.runs[0].tool.driver.rules
-    ]
+    issues: list[str] = []
+    for rule in sarif_output.runs[0].tool.driver.rules or []:
+        rule_id_str = (
+            f"[[{rule.id}]({rule.help_uri})]" if rule.help_uri else f"[{rule.id}]"
+        )
+        full_desc: str | None = (
+            rule.full_description.markdown
+            if rule.full_description and rule.full_description.markdown
+            else rule.full_description.text
+            if rule.full_description and rule.full_description.text
+            else None
+        )
+
+        issue_str = f"##{rule_id_str} {get_rule_name(rule)}\n"
+        if full_desc:
+            issue_str += (
+                f"Background for this rule per {tool_name}'s documentation:\n> "
+            )
+            issue_str += "\n> ".join(full_desc.split("\n")) + "\n"
+        issues.append(issue_str)
 
     # Filter out ignored files from the verdict / annotations (depending on settings)
     if ignored_globs:
