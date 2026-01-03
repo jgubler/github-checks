@@ -52,11 +52,12 @@ steps:
         # since we run on ourselves, we already have a shallow clone of the repo in our CWD
         # we need to unshallow it to access other commits than the build's head commit
         # usually, you'd just clone the repo from scratch here
+        git config --global advice.detachedHead false
+        git config --global safe.directory /workspace
         git remote set-url origin "https://git:$$TOKEN@${_GH_REPO_BASE}.git"
         git fetch --unshallow
 
         git checkout "$_GH_COMMIT_SHA"
-        git config --global safe.directory /workspace
 
   # 3. Reinstall and reinit the checks lib at the to-be-checked revision
   # This is to make sure we're running the to-be-checked code to check itself, giving us

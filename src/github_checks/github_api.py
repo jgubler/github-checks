@@ -33,7 +33,7 @@ def _get_jwt_headers(jwt_str: str, accept_type: str) -> dict[str, str]:
 def _generate_app_jwt_from_pem(
     pem_filepath: Path,
     app_id: str,
-    ttl_seconds: int = 570,  # max 600s allowed by GitHub, avoid 401 due to clock drift
+    ttl_seconds: int,
 ) -> str:
     with pem_filepath.open("rb") as pem_file:
         priv_key = pem_file.read()
@@ -52,24 +52,21 @@ def _generate_app_jwt_from_pem(
 
 
 def _authenticate_as_github_app(  # noqa: PLR0913
-    app_id: str,
+    app_jwt: str,
     app_installation_id: str,
-    app_privkey_pem: Path,
     github_session: Session,
     logger: logging.Logger,
     github_api_base_url: str = "https://api.github.com",
     timeout: int = 10,
-) -> str:
+) -> tuple[str, int]:
     """Authenticate as the specified GitHub App installation to get an access token.
 
-    :param app_id: ID of your app, e.g. found in the URL path of your App config
+    :param app_jwt: JWT token generated for the GitHub App
     :param app_installation_id: ID of the App's installation to the repo
-    :param app_privkey_pem: private key provided by GitHub for this app, in PEM format
     :param github_api_base_url: API URL of your GitHub instance (cloud or enterprise)
     :param timeout: request timeout in seconds, optional, defaults to 10
-    :return: the GitHub App access token
+    :return: the GitHub App access token and its expiration time
     """
-    app_jwt: str = _generate_app_jwt_from_pem(app_privkey_pem, app_id)
     url: str = (
         f"{github_api_base_url}/app/installations/{app_installation_id}/access_tokens"
     )
@@ -83,7 +80,17 @@ def _authenticate_as_github_app(  # noqa: PLR0913
     except HTTPError:
         logger.exception(str(response.text))
         sys.exit(-1)
-    return str(response.json().get("token"))
+
+    token = str(response.json().get("token"))
+    expiry_datetime_str = str(response.json().get("expires_at")).rstrip("Z")
+    expiry_datetime = datetime.fromisoformat(expiry_datetime_str)
+    expiry_timestamp = int(expiry_datetime.replace(tzinfo=timezone.utc).timestamp())
+
+    logger.info(
+        "Authenticated as GitHub App installation successfully, token expires at %s UTC.",  # noqa: E501
+        expiry_datetime_str,
+    )
+    return token, expiry_timestamp
 
 
 def _delete_keys_from_nested_dict(dictionary: dict[str, Any]) -> None:
@@ -129,11 +136,21 @@ class GitHubChecks:
         :param app_privkey_pem: private key provided by GitHub for this app, PEM format
         :param gh_api_timeout: API request timeout in seconds, optional, defaults to 10
         """
+        self._github_session = Session()
+        if logger:
+            self._logger = logger
+        else:
+            logging.basicConfig(
+                level=logging.INFO,
+                format="[%(asctime)s - %(name)s] %(levelname)s: %(message)s",
+            )
+            self._logger = logging.getLogger(__name__)
+        self.app_id = app_id
+        self.app_installation_id = app_installation_id
+        self.app_privkey_pem = app_privkey_pem
+
         # we do need the repo base url later, but we only need domain itself here
         # for github cloud, this would be https://github.com, for enterprise it's diff
-        self._github_session = Session()
-        self._logger = logger or logging.getLogger(__name__)
-
         self._plain_base_url = repo_base_url
         url_parts: ParseResult = urlparse(repo_base_url)
         if not url_parts.scheme or not url_parts.netloc or not url_parts.path:
@@ -142,16 +159,10 @@ class GitHubChecks:
                 repo_base_url,
             )
             sys.exit(-1)
-        github_api_base_url: str = f"{url_parts.scheme}://api.{url_parts.netloc}"
+        self.github_api_base_url: str = f"{url_parts.scheme}://api.{url_parts.netloc}"
 
-        self.app_install_access_token = _authenticate_as_github_app(
-            app_id,
-            app_installation_id,
-            app_privkey_pem,
-            self._github_session,
-            self._logger,
-            github_api_base_url,
-        )
+        self.auth()
+
         self.repo_base_url = (
             f"{url_parts.scheme}://api.{url_parts.netloc}/repos{url_parts.path}"
         )
@@ -160,6 +171,30 @@ class GitHubChecks:
             "application/vnd.github+json",
         )
         self.gh_api_timeout = gh_api_timeout
+
+    def auth(self) -> None:
+        """Authenticate the GitHub session as the GitHub App installation."""
+        # Note: JWT max expiry on GitHub is 10 minutes, install token expiry is 1 hour.
+        # Therefore, JWT expiry doesn't really matter, as we just use it once to
+        # generate an installation access token, and by the time we need a new
+        # installation token, we generate a new JWT anyway. For this reason, we use a
+        # conservative 570s TTL, to avoid occasional 401s due to clock drifts,
+        # which are known to occur with GitHub when using the max JWT expiry of 600s.
+
+        app_jwt: str = _generate_app_jwt_from_pem(
+            self.app_privkey_pem,
+            self.app_id,
+            ttl_seconds=570,
+        )
+        self.app_install_access_token, token_expiry_time = _authenticate_as_github_app(
+            app_jwt,
+            self.app_installation_id,
+            self._github_session,
+            self._logger,
+            self.github_api_base_url,
+        )
+        # installation access tokens should last 1h, re-auth 30s earlier to be safe
+        self.time_to_reauth = token_expiry_time - 30
 
     def start_check_run(
         self,
@@ -172,6 +207,10 @@ class GitHubChecks:
         :param check_name: the name to be used for this specific check
         :raises HTTPError: in case the GitHub API could not start the check run
         """
+        # Check if our token is about to expire, and re-auth if so
+        if time.time() >= self.time_to_reauth:
+            self.auth()
+
         json_payload: dict[str, str] = {
             "name": check_name,
             "head_sha": revision_sha,
@@ -253,6 +292,10 @@ class GitHubChecks:
         output: CheckRunOutput,
         conclusion: CheckRunConclusion,
     ) -> None:
+        # Check if our token is about to expire, and re-auth if so
+        if time.time() >= self.time_to_reauth:
+            self.auth()
+
         json_payload: CheckRunUpdatePOSTBody = CheckRunUpdatePOSTBody(
             name=self._curr_check_name,
             completed_at=self._gen_github_timestamp(),
