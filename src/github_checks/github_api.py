@@ -33,7 +33,7 @@ def _get_jwt_headers(jwt_str: str, accept_type: str) -> dict[str, str]:
 def _generate_app_jwt_from_pem(
     pem_filepath: Path,
     app_id: str,
-    ttl_seconds: int = 600,
+    ttl_seconds: int = 570,  # max 600s allowed by GitHub, avoid 401 due to clock drift
 ) -> str:
     with pem_filepath.open("rb") as pem_file:
         priv_key = pem_file.read()
