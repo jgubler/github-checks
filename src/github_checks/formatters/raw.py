@@ -13,7 +13,7 @@ def format_raw_check_run_output(
     local_repo_base: Path,  # noqa: ARG001
     ignored_globs: list[str] | None = None,  # noqa: ARG001
     *,
-    ignore_verdict_only: bool = False,  # noqa: ARG001
+    mute_ignored_annotations: bool = False,  # noqa: ARG001
 ) -> tuple[CheckRunOutput, CheckRunConclusion]:
     """Generate output for raw checks, to be shown on the "Checks" tab."""
     if not json_output_fp.exists():
