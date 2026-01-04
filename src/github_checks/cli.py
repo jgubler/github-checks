@@ -30,7 +30,7 @@ class LogOutputFormatter(Protocol):
         local_repo_base: Path,
         *,
         ignored_globs: list[str] | None = None,
-        ignore_verdict_only: bool = False,
+        mute_ignored_annotations: bool = False,
     ) -> tuple[CheckRunOutput, CheckRunConclusion]: ...
 
 
@@ -167,25 +167,31 @@ if __name__ == "__main__":
         "If not provided, success/action_required are used, depending on annotations.",
     )
     finish_parser.add_argument(
-        "--checksignore-filepath",
+        "--ignored-globs-filepath",
+        "-i",
         type=Path,
-        help="File containing a list of file patterns to ignore for check annotations "
-        "and the check verdict. Useful to incrementally introduce checks to an existing"
-        " codebase, where some files are not yet compliant with the checks.",
+        help="File containing a list of file pattern globs to ignore for the check "
+        "conclusion verdict. Note that annotations are still published to GitHub for "
+        "these files, just the conclusion calculation is affected. This can be useful "
+        "to incrementally introduce checks to an existing codebase, where some files "
+        "are not yet fully compliant. Where possible, use tool-specific exclusion lists"
+        "instead, via the tool's configuration options (e.g. via the respective section"
+        " in the pyproject.toml), as those will also be respected locally (e.g. in IDE "
+        "linter integrations or pre-commit hooks).",
     )
     finish_parser.add_argument(
-        "--checksignore-verdict-only",
+        "--mute-ignored-annotations",
         action="store_true",
-        help="If set, only the check verdict will be affected by the checksignore file,"
-        "but annotations will still be generated for these files.",
+        help="If set, annotations for ignored files will not just be disregarded when "
+        "calculating the check's conclusion, but they will be filtered entirely prior "
+        "to publishing, silencing them entirely.",
     )
     subparsers.add_parser(
         "cleanup",
-        help="Clean up the local environment variables and"
-        " the pickle file, if present. Recommended to use if you don't"
-        " plan to run another checks run in this environment. Otherwise, sensitive"
-        " information is left on the local file system (e.g. access token), which can"
-        " pose a security risk.",
+        help="Clean up the local environment variables and the pickle file, if present."
+        " Recommended to use if you don't plan to run another checks run in this "
+        "environment. Otherwise, sensitive information is left on the local file system"
+        " (e.g. access token), which can pose a security risk.",
     )
     args = argparser.parse_args(sys.argv[1:])
     gh_checks: GitHubChecks
@@ -217,8 +223,8 @@ if __name__ == "__main__":
         # will throw FileNotFoundError if there's no pickle file, thus exiting uncaught
         gh_checks = unpickle(
             args.pickle_filepath,
-            "[github-checks] Trying to start a github check without "
-            "initialization (pickle file not found). Aborting.",
+            "[github-checks] Trying to start a github check without initialization "
+            "(pickle file not found). Aborting.",
         )
 
         gh_checks.start_check_run(
@@ -246,8 +252,8 @@ if __name__ == "__main__":
             gh_checks = pickle.load(pickle_file)  # noqa: S301
 
         ignored_globs: list[str] | None = None
-        if args.checksignore_filepath and args.checksignore_filepath.exists():
-            with args.checksignore_filepath.open("r", encoding="utf-8") as ignore_file:
+        if args.ignored_globs_filepath and args.ignored_globs_filepath.exists():
+            with args.ignored_globs_filepath.open("r", encoding="utf-8") as ignore_file:
                 ignored_globs = ignore_file.readlines()
 
         check_run_output: CheckRunOutput
@@ -256,7 +262,7 @@ if __name__ == "__main__":
             Path(args.validation_log),
             Path(args.local_repo_path),
             ignored_globs=ignored_globs,
-            ignore_verdict_only=args.checksignore_verdict_only,
+            mute_ignored_annotations=args.mute_ignored_annotations,
         )
         if args.conclusion:
             # override if present
