@@ -53,7 +53,8 @@ def unpickle(pickle_fp: Path, err_msg: str) -> GitHubChecks:
         return cast("GitHubChecks", pickle.load(pickle_file))  # noqa: S301
 
 
-if __name__ == "__main__":
+def main() -> None:  # noqa: C901, PLR0915
+    """Handle the main entry point for the github-checks CLI."""
     argparser = ArgumentParser(
         prog="github-checks",
         description="CLI for the github-checks library. Please note: the commands of "
@@ -273,22 +274,20 @@ if __name__ == "__main__":
             gh_checks = pickle.load(pickle_file)  # noqa: S301
 
         ignored_globs: list[str] | None = None
-        if args.ignored_globs_filepath and args.ignored_globs_filepath.exists():
-            with args.ignored_globs_filepath.open("r", encoding="utf-8") as ignore_file:
+        if (ign_globs_fp := args.ignored_globs_filepath) and ign_globs_fp.exists():
+            with ign_globs_fp.open("r", encoding="utf-8") as ignore_file:
                 ignored_globs = ignore_file.readlines()
 
+        included_globs: list[str] | None = None
         if (incl_globs_fp := args.included_globs_filepath) and incl_globs_fp.exists():
             with incl_globs_fp.open("r", encoding="utf-8") as include_file:
                 included_globs = include_file.readlines()
-            if args.ignore_except_included:
-                # if we are to ignore everything except the included globs,
-                # we set the ignored globs to be everything not in the included globs
-                ignored_globs = [f"!{glob.strip()}" for glob in included_globs]
-            else:
-                # otherwise, we just add the included globs as negative ignores
-                if ignored_globs is None:
-                    ignored_globs = []
-                ignored_globs.extend(f"!{glob.strip()}" for glob in included_globs)
+
+        ignored_globs = compute_ignored_globs(
+            ignored_globs,
+            included_globs,
+            ignore_except_included=args.ignore_except_included,
+        )
 
         check_run_output: CheckRunOutput
         check_run_conclusion: CheckRunConclusion
@@ -319,3 +318,40 @@ if __name__ == "__main__":
             "GH_CHECK_NAME",
         ]:
             os.environ.pop(env_var, default=None)
+
+
+def compute_ignored_globs(
+    ignored_globs: list[str] | None,
+    included_globs: list[str] | None,
+    *,
+    ignore_except_included: bool,
+) -> list[str] | None:
+    """Compute the final ignored globs based on inputs.
+
+    Args:
+        ignored_globs: List of globs to ignore.
+        included_globs: List of globs to include.
+        ignore_except_included: Whether to ignore everything except the included globs.
+        Returns: The final list of ignored globs.
+    """
+    final_ignored_globs: list[str] | None
+
+    # transform included globs to negative ignores
+    negative_ignores: list[str] | None = None
+    if included_globs:
+        negative_ignores = [f"!{glob.strip()}" for glob in included_globs]
+
+    if ignore_except_included:
+        # if we are to ignore everything except the included globs,
+        # we set the ignored globs to be everything not in the included globs
+        final_ignored_globs = negative_ignores
+    else:
+        # otherwise, we just add the included globs to the end as negative ignores
+        final_ignored_globs = ignored_globs or []
+        final_ignored_globs.extend(negative_ignores or [])
+
+    return final_ignored_globs if final_ignored_globs else None
+
+
+if __name__ == "__main__":
+    main()
