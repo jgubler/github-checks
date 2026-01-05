@@ -8,5 +8,6 @@ pycodestyle
 pydocstyle
 pyright
 pytest
+pytest-cov
 ruff
 types-requests

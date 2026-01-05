@@ -7,6 +7,10 @@ from github_checks.models import (
     CheckRunOutput,
 )
 
+# GitHub's max length for POST bodies is around 65k bytes
+# Use a smaller limit to leave room for other fields and multi-byte unicode characters
+MAX_OUTPUT_LENGTH = 30000
+
 
 def format_raw_check_run_output(
     json_output_fp: Path,
@@ -31,10 +35,18 @@ def format_raw_check_run_output(
                 else CheckRunConclusion.ACTION_REQUIRED
             )
 
+    if len(raw_output) > MAX_OUTPUT_LENGTH:
+        summary = (
+            raw_output[:MAX_OUTPUT_LENGTH]
+            + "\n\n... (truncated output, see full text log for details) ..."
+        )
+    else:
+        summary = raw_output
+
     # Process the raw output and create the CheckRunOutput and CheckRunConclusion
     output = CheckRunOutput(
         title="Raw Check Results",
-        summary=raw_output,
+        summary=summary,
         annotations=[],
     )
 
