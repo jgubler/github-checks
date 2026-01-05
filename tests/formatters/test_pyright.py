@@ -57,7 +57,7 @@ def test_format_pyright_check_run_output_with_issues() -> None:
         sample_output_fp,
         Path(__file__).parent.parent.parent,
         ignored_globs=None,
-        ignore_verdict_only=False,
+        mute_ignored_annotations=False,
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.ACTION_REQUIRED

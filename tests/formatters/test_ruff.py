@@ -46,7 +46,7 @@ def test_format_ruff_check_run_output_with_issues() -> None:
         sample_output_fp,
         REPO_ROOT,
         ignored_globs=None,
-        ignore_verdict_only=False,
+        mute_ignored_annotations=True,
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.ACTION_REQUIRED
@@ -73,7 +73,7 @@ def test_format_ruff_check_run_output_with_issues_ignored() -> None:
         sample_output_fp,
         REPO_ROOT,
         ignored_globs=["/src/github_checks/"],
-        ignore_verdict_only=True,
+        mute_ignored_annotations=False,
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.SUCCESS
@@ -97,7 +97,7 @@ def test_format_ruff_check_run_output_no_issues() -> None:
         empty_json_fp,
         REPO_ROOT,
         ignored_globs=None,
-        ignore_verdict_only=False,
+        mute_ignored_annotations=True,
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.SUCCESS
