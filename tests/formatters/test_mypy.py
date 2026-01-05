@@ -43,7 +43,7 @@ def test_format_mypy_check_run_output_with_issues() -> None:
         sample_output_fp,
         Path(__file__).parent.parent.parent,
         ignored_globs=None,
-        ignore_verdict_only=False,
+        mute_ignored_annotations=False,
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.ACTION_REQUIRED
@@ -67,7 +67,7 @@ def test_format_mypy_check_run_output_no_issues() -> None:
         empty_json_fp,
         Path(__file__).parent,
         ignored_globs=None,
-        ignore_verdict_only=False,
+        mute_ignored_annotations=False,
     )
     assert isinstance(output, CheckRunOutput)
     assert conclusion == CheckRunConclusion.SUCCESS

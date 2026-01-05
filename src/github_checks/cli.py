@@ -180,6 +180,27 @@ if __name__ == "__main__":
         "linter integrations or pre-commit hooks).",
     )
     finish_parser.add_argument(
+        "--included-globs-filepath",
+        type=Path,
+        help="File containing a list of file pattern globs to explicitly include. "
+        "Note that this overrides any ignores specified in --ignored-globs-filepath. "
+        "This can be useful to e.g. dump the result of `git diff <base_branch> "
+        "--name-only` into a file and pass it here, to include issues in any files "
+        "changed in a pull request, even if a file is generally excluded, thus "
+        "encouraging contributors to refactor existing debt in drive-by mode.",
+    )
+    finish_parser.add_argument(
+        "--ignore-except-included",
+        action="store_true",
+        help="If set, only files matching the globs in --included-globs-filepath will "
+        "be considered for the check conclusion and annotations. All other files will "
+        'be ignored entirely. Can be useful to operate in a "diff-only validation" mode'
+        ", where only strictly the files changed in a PR are considered. Danger: This "
+        "can lead to dismissal of failed (unmodified) tests, or oversight of failed "
+        "side-effects, such as breaking type validation elsewhere in the codebase. Use "
+        "with caution. Requires --included-globs-filepath to be set.",
+    )
+    finish_parser.add_argument(
         "--mute-ignored-annotations",
         action="store_true",
         help="If set, annotations for ignored files will not just be disregarded when "
@@ -255,6 +276,19 @@ if __name__ == "__main__":
         if args.ignored_globs_filepath and args.ignored_globs_filepath.exists():
             with args.ignored_globs_filepath.open("r", encoding="utf-8") as ignore_file:
                 ignored_globs = ignore_file.readlines()
+
+        if (incl_globs_fp := args.included_globs_filepath) and incl_globs_fp.exists():
+            with incl_globs_fp.open("r", encoding="utf-8") as include_file:
+                included_globs = include_file.readlines()
+            if args.ignore_except_included:
+                # if we are to ignore everything except the included globs,
+                # we set the ignored globs to be everything not in the included globs
+                ignored_globs = [f"!{glob.strip()}" for glob in included_globs]
+            else:
+                # otherwise, we just add the included globs as negative ignores
+                if ignored_globs is None:
+                    ignored_globs = []
+                ignored_globs.extend(f"!{glob.strip()}" for glob in included_globs)
 
         check_run_output: CheckRunOutput
         check_run_conclusion: CheckRunConclusion
