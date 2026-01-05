@@ -144,23 +144,59 @@ steps:
       - 'GH_CHECK_REVISION=$_GH_COMMIT_SHA'
       - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
 
-  # 4. random raw output to test the raw log format
+  # 4. run pytest as a raw check until we have support for --json-report/--json-report-file
   - name: 'python:3.11'
-    id: 'nonsense-raw-checks'
+    id: 'pytest-checks-raw'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
         source /workspace/venv/bin/activate
-        python3 -m github_checks.cli start-check-run --check-name test-raw-checks
-        echo "I just don't like this code but fine I guess" > raw_output.json
-        python3 -m github_checks.cli finish-check-run raw_output.json --log-format raw --conclusion success
+        python3 -m github_checks.cli start-check-run --check-name pytest-checks-raw
+        pytest . > pytest_raw_output.txt
+        CONCLUSION=$([[ $$? -eq 0 ]] && echo "success" || echo "action_required")
+        python3 -m github_checks.cli finish-check-run pytest_raw_output.txt --conclusion $$CONCLUSION --log-format raw
     env:
       - 'GH_LOCAL_REPO_PATH=$_GH_LOCAL_REPO_PATH'
       - 'GH_CHECK_REVISION=$_GH_COMMIT_SHA'
       - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
 
-  # 5. run the jsonschema checks on an example file for testing
+  # 5. upload pytest coverage as a neutral-conclusion check
+  - name: 'python:3.11'
+    id: 'pytest-coverage-report'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source /workspace/venv/bin/activate
+        python3 -m github_checks.cli start-check-run --check-name pytest-coverage-report
+        pytest --cov=github_checks tests/ > pytest_coverage_output.txt
+        python3 -m github_checks.cli finish-check-run pytest_coverage_output.txt --conclusion neutral --log-format raw
+    env:
+      - 'GH_LOCAL_REPO_PATH=$_GH_LOCAL_REPO_PATH'
+      - 'GH_CHECK_REVISION=$_GH_COMMIT_SHA'
+      - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
+  
+  # 6. run bandit as a raw check until we have support for its -f json option
+  - name: 'python:3.11'
+    id: 'bandit-checks-raw'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source /workspace/venv/bin/activate
+        python3 -m github_checks.cli start-check-run --check-name bandit-checks-raw
+        bandit -r . -x "./tests/","./venv/" > bandit_raw_output.txt
+        cat bandit_raw_output.txt
+        CONCLUSION=$([[ $$? -eq 0 ]] && echo "success" || echo "action_required")
+        cat $$CONCLUSION
+        python3 -m github_checks.cli finish-check-run bandit_raw_output.txt --conclusion $$CONCLUSION --log-format raw
+    env:
+      - 'GH_LOCAL_REPO_PATH=$_GH_LOCAL_REPO_PATH'
+      - 'GH_CHECK_REVISION=$_GH_COMMIT_SHA'
+      - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
+
+  # 7. run the jsonschema checks on an example file for testing
   - name: 'python:3.11'
     id: 'jsonschema-checks'
     entrypoint: 'bash'
@@ -176,7 +212,7 @@ steps:
       - 'GH_CHECK_REVISION=$_GH_COMMIT_SHA'
       - 'GH_PICKLE_FILEPATH=$_GH_PICKLE_FILEPATH'
 
-  # 6. run the sarif checks on ourselves via ruff
+  # 8. run the sarif checks on ourselves via ruff
   - name: 'python:3.11'
     id: 'sarif-ruff-checks'
     entrypoint: 'bash'
