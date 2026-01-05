@@ -9,5 +9,6 @@ pydocstyle
 pyright
 pytest
 pytest-cov
+pytest-md-report
 ruff
 types-requests
