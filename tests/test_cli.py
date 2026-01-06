@@ -1,4 +1,6 @@
-import pytest  # noqa: D100, INP001
+# type: ignore  # noqa: PGH003
+# ruff: noqa: S101, D103, D100, INP001, ANN001
+import pytest
 
 from github_checks.cli import (
     compute_ignored_globs,
@@ -15,16 +17,16 @@ from github_checks.cli import (
         (["*.pyc", "*.log"], ["src/*.py"], True, ["!src/*.py"]),
         (None, None, True, None),
     ],
-)  # type: ignore[misc]
-def test_compute_ignored_globs(  # type: ignore[no-untyped-def] # noqa: D103
-    ignored_globs,  # noqa: ANN001
-    included_globs,  # noqa: ANN001
-    ignore_except_included,  # noqa: ANN001
-    expected,  # noqa: ANN001
+)
+def test_compute_ignored_globs(
+    ignored_globs,
+    included_globs,
+    ignore_except_included,
+    expected,
 ) -> None:
     result = compute_ignored_globs(
         ignored_globs=ignored_globs,
         included_globs=included_globs,
         ignore_except_included=ignore_except_included,
     )
-    assert result == expected  # noqa: S101
+    assert result == expected
