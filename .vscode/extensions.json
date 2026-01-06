@@ -6,7 +6,8 @@
         "ms-python.black-formatter",
         "ms-python.isort",
         "charliermarsh.ruff",
-        "eamodio.gitlens",
         "tamasfe.even-better-toml",
+        "DavidAnson.vscode-markdownlint",
+        "timonwong.shellcheck"
     ]
 }
