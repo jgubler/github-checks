@@ -1,3 +1,6 @@
+# type: ignore  # noqa: PGH003
+# ruff: noqa: S101, D103, D100, INP001
+
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -6,10 +9,8 @@ import pytest
 from github_checks.formatters.utils import filter_for_checksignore, get_conclusion
 from github_checks.models import AnnotationLevel, CheckAnnotation, CheckRunConclusion
 
-# ruff: noqa: S101, D103, D100, INP001
 
-
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def annotations() -> list[CheckAnnotation]:
     return [
         CheckAnnotation(
@@ -55,7 +56,7 @@ def test_filter_for_checksignore_no_ignore_globs(
 
 
 @patch("os.chdir")
-def test_filter_for_checksignore_with_ignore_globs(  # type: ignore[no-untyped-def]
+def test_filter_for_checksignore_with_ignore_globs(
     mock_chdir,  # noqa: ANN001
     annotations: list[CheckAnnotation],
 ) -> None:
@@ -78,7 +79,7 @@ def test_filter_for_checksignore_with_ignore_globs(  # type: ignore[no-untyped-d
 
 
 @patch("os.chdir")
-def test_filter_for_checksignore_with_ignore_globs_full(  # type: ignore[no-untyped-def]
+def test_filter_for_checksignore_with_ignore_globs_full(
     mock_chdir,  # noqa: ANN001
     annotations: list[CheckAnnotation],
 ) -> None:
