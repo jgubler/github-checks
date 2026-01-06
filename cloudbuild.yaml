@@ -187,7 +187,6 @@ steps:
         source /workspace/venv/bin/activate
         python3 -m github_checks.cli start-check-run --check-name bandit-checks-raw
         bandit -r . -x "./tests/","./venv/" > bandit_raw_output.txt
-        cat bandit_raw_output.txt
         CONCLUSION=$([[ $$? -eq 0 ]] && echo "success" || echo "action_required")
         cat $$CONCLUSION
         python3 -m github_checks.cli finish-check-run bandit_raw_output.txt --conclusion $$CONCLUSION --log-format raw
