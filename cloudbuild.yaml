@@ -59,6 +59,10 @@ steps:
 
         git checkout "$_GH_COMMIT_SHA"
 
+        # todo: this assumes PRs always target main, which isn't necessarily the case
+        # improve this by using the webhook's base revision instead of hardcoded main
+        git diff --name-only main > .changed_files
+
   # 3. Reinstall and reinit the checks lib at the to-be-checked revision
   # This is to make sure we're running the to-be-checked code to check itself, giving us
   # a 2-in-1 validation of the code being both clean and working as intended in one build.
@@ -138,7 +142,7 @@ steps:
         source /workspace/venv/bin/activate
         python3 -m github_checks.cli start-check-run --check-name pyright-checks
         pyright . --outputjson > pyright_output.json
-        python3 -m github_checks.cli finish-check-run pyright_output.json --log-format pyright-json -i .checksignore
+        python3 -m github_checks.cli finish-check-run pyright_output.json --log-format pyright-json --included-globs-filepath .changed_files
     env:
       - 'GH_LOCAL_REPO_PATH=$_GH_LOCAL_REPO_PATH'
       - 'GH_CHECK_REVISION=$_GH_COMMIT_SHA'
